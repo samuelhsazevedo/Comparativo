@@ -1,0 +1,2093 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Prospecção de Frete</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2/dist/chartjs-plugin-datalabels.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#EEF0FA;
+    --panel:#ffffff;
+    --panel-2:#F5F6FC;
+    --line:#DDE1F0;
+    --text:#1E2340;
+    --text-dim:#8A90A6;
+    --primary:#3B2FBF;
+    --secondary:#4B3FE0;
+    --accent:#5347EE;
+    --accent-green:#2CD9A6;
+    --accent-red:#FF5C5C;
+    --warn:#FFB020;
+    --danger:#FF5C5C;
+    --ok:#2CD9A6;
+    --radius:10px;
+    --card-radius:18px;
+    --shadow:0 10px 30px -12px rgba(30,35,64,.12);
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:'Inter',"Segoe UI",sans-serif;-webkit-font-smoothing:antialiased;}
+  h1,h2,h3,.display{font-family:'Poppins',sans-serif;font-weight:700;letter-spacing:-.01em;color:var(--text);}
+  .mono{font-family:'Inter',sans-serif;font-variant-numeric:tabular-nums;}
+  #app{display:grid;grid-template-columns:260px 1fr;min-height:100vh;}
+
+  /* Sidebar */
+  #sidebar{background:linear-gradient(160deg,var(--accent) 0%,var(--primary) 100%);color:#fff;padding:26px 0;display:flex;flex-direction:column;gap:2px;}
+  .brand{display:flex;align-items:center;gap:10px;padding:0 20px 26px;}
+  .brand-mark{width:34px;height:34px;border-radius:9px;background:rgba(255,255,255,.16);display:flex;align-items:center;justify-content:center;font-family:'Poppins';font-weight:700;color:#fff;font-size:15px;}
+  .brand-text .t1{font-family:'Poppins';font-weight:700;color:#fff;font-size:14.5px;line-height:1.2;}
+  .brand-text .t2{font-size:11px;color:rgba(255,255,255,.62);letter-spacing:.03em;}
+  .navitem{display:flex;align-items:center;gap:11px;width:calc(100% - 28px);padding:13px 20px;border-radius:12px;cursor:pointer;font-size:14px;font-weight:600;font-family:'Poppins';color:rgba(255,255,255,.68);transition:.15s;margin:2px 14px;border-left:4px solid transparent;}
+  .navitem svg{width:17px;height:17px;flex-shrink:0;}
+  .navitem:hover{background:rgba(255,255,255,.10);color:#fff;}
+  .navitem.active{background:rgba(255,255,255,.16);color:#fff;border-left:4px solid var(--accent-green);}
+  .navitem.active .navdot{background:var(--accent-green);}
+  .navdot{width:5px;height:5px;border-radius:50%;background:transparent;margin-left:auto;}
+  .sidebar-foot{margin-top:auto;padding:14px 20px;border-top:1px solid rgba(255,255,255,.16);font-size:11px;color:rgba(255,255,255,.6);line-height:1.5;}
+  .mode-pill{display:inline-flex;align-items:center;gap:6px;font-size:10.5px;font-weight:700;padding:3px 9px;border-radius:100px;background:rgba(255,255,255,.16);color:#fff;letter-spacing:.02em;margin-bottom:8px;font-family:'Poppins';}
+  .mode-pill .dot{width:6px;height:6px;border-radius:50%;background:var(--accent-green);}
+
+  /* Main */
+  #main{padding:32px 40px;max-width:1240px;}
+  .page{display:none;animation:fade .25s ease;}
+  .page.active{display:block;}
+  @keyframes fade{from{opacity:0;transform:translateY(4px);}to{opacity:1;transform:none;}}
+  .page-head{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:24px;gap:20px;flex-wrap:wrap;}
+  .page-head h1{font-size:20px;margin:0 0 4px;color:var(--text);letter-spacing:-.01em;}
+  .page-head p{margin:0;color:var(--text-dim);font-size:13px;max-width:520px;font-family:'Inter';}
+
+  .btn{border:none;border-radius:10px;padding:10px 18px;font-family:'Poppins';font-weight:600;font-size:13.5px;cursor:pointer;display:inline-flex;align-items:center;gap:8px;transition:background .15s ease;}
+  .btn-primary{background:var(--accent);color:#fff;}
+  .btn-primary:hover{background:var(--secondary);}
+  .btn-outline{background:var(--panel-2);color:var(--text);border:1px solid var(--line);}
+  .btn-outline:hover{background:#E7E9F7;}
+  .btn:disabled{opacity:.45;cursor:not-allowed;}
+
+  /* KPI cards */
+  .kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:18px;margin-bottom:24px;}
+  .kpi-card{background:var(--panel);border-radius:var(--card-radius);padding:20px 22px;box-shadow:var(--shadow);border-left:5px solid var(--accent);}
+  .kpi-card .label{font-size:12.5px;color:var(--text-dim);font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;font-family:'Inter';}
+  .kpi-card .value{font-family:'Poppins';font-size:28px;font-weight:800;color:var(--text);}
+  .kpi-card .delta{font-size:12.5px;margin-top:4px;font-weight:600;font-family:'Inter';color:var(--text-dim);}
+  .delta.up{color:var(--danger);}
+  .delta.down{color:#0E9A79;}
+
+  .card{background:var(--panel);border-radius:var(--card-radius);box-shadow:var(--shadow);padding:24px 26px;margin-bottom:24px;}
+  .card h3{margin:0 0 3px;font-size:16px;color:var(--text);}
+  .card .sub{font-size:12.5px;color:var(--text-dim);margin:0 0 16px;font-family:'Inter';}
+
+  /* Upload module */
+  .upload-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;}
+  .dropzone{border:2px dashed var(--line);border-radius:var(--card-radius);padding:30px 20px;text-align:center;background:var(--panel-2);cursor:pointer;transition:.15s;position:relative;color:var(--text-dim);}
+  .dropzone:hover{border-color:var(--accent);background:#EEF0FF;color:var(--accent);}
+  .dropzone.filled{border-style:solid;border-color:var(--accent-green);background:rgba(44,217,166,.08);}
+  .dropzone input{position:absolute;inset:0;opacity:0;cursor:pointer;}
+  .dz-icon{width:30px;height:30px;margin:0 auto 10px;color:inherit;}
+  .dz-title{font-weight:600;font-size:13.5px;color:var(--text);font-family:'Poppins';}
+  .dz-sub{font-size:11.5px;color:var(--text-dim);margin-top:3px;font-family:'Inter';}
+  .dz-file{font-family:'Inter';font-size:11px;color:var(--accent);margin-top:8px;word-break:break-all;font-weight:600;}
+
+  table{width:100%;border-collapse:collapse;font-size:13.5px;background:var(--panel);border-radius:var(--card-radius);overflow:hidden;}
+  th{text-align:left;font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:#fff;font-weight:600;padding:12px 14px;background:var(--primary);font-family:'Poppins';}
+  td{padding:10px 14px;border-bottom:1px solid #f0f0f4;color:var(--text);font-family:'Inter';}
+  tbody tr:last-child td{border-bottom:none;}
+  td.mono, .mono-cell{font-family:'Inter';font-size:13px;}
+  .table-scroll{max-height:260px;overflow:auto;border-radius:var(--card-radius);}
+  tbody tr:hover td{background:#f4f8fd;}
+
+  .status-line{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-dim);margin-top:12px;font-family:'Inter';}
+  .status-line .dot{width:7px;height:7px;border-radius:50%;background:var(--line);}
+  .status-line.ok .dot{background:var(--accent-green);}
+  .status-line.err .dot{background:var(--danger);}
+
+  /* Filters */
+  .filters{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:22px;}
+  select, .field-input{font-family:'Inter';font-size:13px;padding:10px 12px;border-radius:8px;border:1px solid var(--line);background:var(--panel-2);color:var(--text);min-width:160px;}
+  select:focus, .field-input:focus{outline:2px solid var(--accent);outline-offset:1px;border-color:var(--accent);}
+
+  /* Route comparison rows — estilo "bar-row" do painel interno */
+  .route-row{display:grid;grid-template-columns:60px 1fr 40px 1fr;align-items:center;gap:0;padding:18px 8px;border-bottom:1px solid var(--panel-2);}
+  .route-row:last-child{border-bottom:none;}
+  .uf-tag{font-family:'Poppins';font-weight:800;font-size:15px;color:var(--primary);}
+  .route-side{padding:0 14px;}
+  .route-side .k{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--text-dim);font-weight:600;font-family:'Inter';}
+  .route-side .v{font-family:'Poppins';font-size:14.5px;font-weight:700;margin-top:2px;}
+  .route-side.def .v{color:#8A90A6;}
+  .route-side.pros .v{color:var(--accent);}
+  .route-mid{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;}
+  .route-line{width:2px;height:26px;background:var(--line);}
+  .route-arrow{font-size:9px;color:var(--text-dim);}
+  .var-badge{font-family:'Poppins';font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;}
+  .var-badge.up{background:rgba(255,92,92,.14);color:var(--danger);}
+  .var-badge.down{background:rgba(44,217,166,.16);color:#0E9A79;}
+
+  .legend-chip{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--text-dim);font-family:'Inter';}
+  .legend-chip .sw{width:9px;height:9px;border-radius:3px;}
+  .legend-row{display:flex;gap:18px;margin-bottom:14px;}
+
+  .charts-grid{display:grid;grid-template-columns:1.3fr 1fr;gap:18px;}
+  canvas{max-height:290px;}
+
+  .empty-state{text-align:center;padding:40px 20px;color:var(--text-dim);font-family:'Inter';}
+  .empty-state svg{width:36px;height:36px;margin-bottom:10px;opacity:.5;}
+  .empty-state p{font-size:13px;margin:0;}
+
+  .field-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;}
+  label{display:block;font-size:12px;font-weight:600;color:var(--text-dim);margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em;font-family:'Inter';}
+  code.inline{background:var(--panel-2);border:1px solid var(--line);padding:1px 6px;border-radius:5px;font-size:11.5px;font-family:'Inter';color:var(--primary);}
+
+  /* Abas de janela (estilo navegador) dentro da página Painel */
+  .painel-tabs{display:flex;gap:4px;margin-bottom:0;border-bottom:2px solid var(--line);}
+  .painel-tab{background:var(--panel-2);border:1px solid var(--line);border-bottom:none;border-radius:10px 10px 0 0;
+    padding:10px 20px;font-family:'Poppins';font-weight:600;font-size:13px;color:var(--text-dim);cursor:pointer;
+    position:relative;top:2px;transition:.15s;}
+  .painel-tab:hover{color:var(--text);}
+  .painel-tab.active{background:var(--panel);color:var(--primary);border-color:var(--line);border-bottom:2px solid var(--panel);}
+  .painel-janela{padding-top:22px;}
+
+  /* Modal */
+  .modal-overlay{position:fixed;inset:0;background:rgba(30,35,64,.55);display:flex;align-items:center;justify-content:center;z-index:100;}
+  .modal-card{background:var(--panel);border-radius:var(--card-radius);box-shadow:var(--shadow);padding:28px 30px;width:480px;max-width:92vw;max-height:88vh;overflow:auto;}
+  .modal-card h3{margin:0 0 4px;}
+  .modal-close{position:absolute;top:16px;right:18px;background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-dim);}
+
+  /* Tabela "Geral" expansível */
+  .tabela-geral td.regiao-toggle{cursor:pointer;font-weight:700;color:var(--primary);}
+  .tabela-geral tr.linha-uf{background:var(--panel-2);}
+  .tabela-geral tr.linha-uf td:first-child{padding-left:28px;color:var(--text-dim);font-weight:500;}
+
+  /* Rotas/Faixas comparadas — várias métricas por lado */
+  .rota-metricas{display:flex;flex-direction:column;gap:5px;}
+  .rota-metricas .item{display:flex;justify-content:space-between;gap:10px;font-size:11.5px;line-height:1.3;}
+  .rota-metricas .item .k{color:var(--text-dim);}
+  .rota-metricas .item .v{font-family:'Poppins';font-weight:600;}
+
+  @media(max-width:900px){
+    #app{grid-template-columns:1fr;}
+    #sidebar{display:none;}
+    .kpi-row{grid-template-columns:1fr 1fr;}
+    .upload-grid, .charts-grid, .field-row{grid-template-columns:1fr;}
+    .route-row{grid-template-columns:50px 1fr 40px 1fr;}
+  }
+
+  /* Impressão da janela Comparativo — só o que não tem .no-print,
+     e só dentro de #janela-comparativo (esconde sidebar, filtros,
+     botões e a tabela Geral). */
+  @media print{
+    body *{visibility:hidden;}
+    #janela-comparativo, #janela-comparativo *{visibility:visible;}
+    #janela-comparativo{position:absolute;left:0;top:0;width:100%;padding:0;}
+    .no-print{display:none !important;}
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <aside id="sidebar">
+    <div class="brand">
+      <div class="brand-mark">PF</div>
+      <div class="brand-text">
+        <div class="t1">Prospecção de Frete</div>
+        <div class="t2">Logística</div>
+      </div>
+    </div>
+    <div class="navitem active" data-page="painel"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>Painel<span class="navdot"></span></div>
+    <div class="navitem" data-page="upload"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3v12M12 3l-4 4M12 3l4 4"/><path d="M4 15v3a2 2 0 002 2h12a2 2 0 002-2v-3"/></svg>Upload<span class="navdot"></span></div>
+    <div class="navitem" data-page="simulacao"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h4"/></svg>Simulação<span class="navdot"></span></div>
+    <div class="navitem" data-page="config"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 11-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06A1.65 1.65 0 004.6 15a1.65 1.65 0 00-1.51-1H3a2 2 0 110-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06A1.65 1.65 0 009 4.6a1.65 1.65 0 001-1.51V3a2 2 0 114 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>Configurações<span class="navdot"></span></div>
+    <div class="sidebar-foot">
+      <div class="mode-pill" id="modePill"><span class="dot"></span><span id="modeLabel">Modo demonstração</span></div><br>
+      <span>Conexão Supabase configurável no topo do arquivo (<code style="color:#8a8fb0">SUPABASE_URL</code>).</span>
+    </div>
+  </aside>
+
+
+  <main id="main">
+
+    <!-- VISÃO GERAL -->
+    <section class="page active" id="page-painel">
+      <div class="page-head">
+        <div><h1>Painel</h1><p>Visão consolidada das prospecções e comparativo detalhado Definitivo × Proposta.</p></div>
+      </div>
+
+      <div class="painel-tabs">
+        <button class="painel-tab active" data-janela="visaogeral">Visão Geral</button>
+        <button class="painel-tab" data-janela="comparativo">Comparativo</button>
+      </div>
+
+      <!-- JANELA: VISÃO GERAL -->
+      <div class="painel-janela" id="janela-visaogeral">
+        <div class="page-head" style="margin-bottom:18px;">
+          <div></div>
+          <button class="btn btn-primary" id="btnAdicionarProposta">Adicionar Proposta</button>
+        </div>
+        <div class="kpi-row" id="kpiOverview"></div>
+        <div class="card">
+          <h3>Prospecções cadastradas</h3>
+          <p class="sub">Clique numa linha para ver o comparativo detalhado dessa proposta.</p>
+          <div class="table-scroll">
+            <table id="tblProspeccoes"><thead><tr><th>Data da Proposta</th><th>Transportadora</th><th>CTes cruzados</th></tr></thead><tbody></tbody></table>
+          </div>
+        </div>
+      </div>
+
+      <!-- JANELA: COMPARATIVO -->
+      <div class="painel-janela" id="janela-comparativo" style="display:none;">
+        <div class="filters no-print">
+          <select id="fProspeccao"></select>
+          <select id="fEmpresa">
+            <option value="">Matriz + Viana</option>
+            <option value="Matriz">Somente Matriz</option>
+            <option value="Viana">Somente Viana</option>
+          </select>
+          <button class="btn btn-outline" id="btnOcultarDefinitivo">Ocultar Frete Definitivo</button>
+          <button class="btn btn-outline" id="btnImprimirComparativo">Imprimir gráficos</button>
+        </div>
+
+        <div class="kpi-row" id="kpiDashboard"></div>
+
+        <div class="charts-grid">
+          <div class="card">
+            <h3>Comparativo Custo/kg</h3>
+            <p class="sub">Definitivo vs. Proposta — proposta selecionada</p>
+            <canvas id="chartCustoKgRosca"></canvas>
+          </div>
+          <div class="card">
+            <h3>Percentual de Frete</h3>
+            <p class="sub">% do valor da nota, por UF</p>
+            <canvas id="chartPercFreteLinha"></canvas>
+          </div>
+        </div>
+        <div class="card">
+          <h3>Composição de taxas</h3>
+          <p class="sub">Definitivo vs. Proposta, por componente</p>
+          <div style="overflow-x:auto;"><div style="min-width:760px;height:320px;"><canvas id="chartTaxasComparativo"></canvas></div></div>
+        </div>
+        <div class="card">
+          <h3>Prazo de entrega</h3>
+          <p class="sub">Média de dias, por UF</p>
+          <div style="overflow-x:auto;"><div style="min-width:760px;height:320px;"><canvas id="chartPrazoUf"></canvas></div></div>
+        </div>
+
+        <div class="card">
+          <h3>Rotas comparadas</h3>
+          <div class="legend-row" id="legendaRotas">
+            <span class="legend-chip"><span class="sw" style="background:#B9BED4"></span>Definitivo (histórico)</span>
+            <span class="legend-chip"><span class="sw" style="background:#5347EE"></span>Proposta (avaliada)</span>
+          </div>
+          <div id="routeList"></div>
+        </div>
+
+        <div class="card">
+          <h3>Faixa de peso</h3>
+          <div class="legend-row" id="legendaFaixas">
+            <span class="legend-chip"><span class="sw" style="background:#B9BED4"></span>Definitivo (histórico)</span>
+            <span class="legend-chip"><span class="sw" style="background:#5347EE"></span>Proposta (avaliada)</span>
+          </div>
+          <div id="faixaList"></div>
+        </div>
+
+        <div class="card no-print" id="cardTabelaGeral">
+          <h3>Geral</h3>
+          <p class="sub">Por região — clique no nome da região para expandir os estados.</p>
+          <div class="table-scroll">
+            <table class="tabela-geral" id="tblGeral">
+              <thead><tr id="tblGeralHead">
+                <th>Região</th><th>Valor total de NF</th>
+                <th>Valor total Proposta</th><th>% Frete Proposta</th><th>Prazo Proposta</th>
+                <th class="col-definitivo">Valor total Definitivo</th><th class="col-definitivo">% Frete Definitivo</th><th class="col-definitivo">Prazo Definitivo</th>
+                <th class="col-definitivo">Transportadora (Definitivo)</th>
+              </tr></thead>
+              <tbody id="tblGeralBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- MODAL: Adicionar Proposta -->
+    <div class="modal-overlay" id="modalProposta" style="display:none;">
+      <div class="modal-card" style="position:relative;">
+        <button class="modal-close" id="btnFecharModalProposta">&times;</button>
+        <h3>Adicionar Proposta</h3>
+        <p class="sub">Envie o Arquivo de Prospecção já preenchido pela transportadora.</p>
+        <div class="field-row" style="margin-top:16px;">
+          <div>
+            <label>Data da proposta</label>
+            <div style="display:flex;gap:8px;">
+              <input class="field-input" style="flex:1" type="date" id="modalInpDataProposta">
+              <button type="button" class="btn btn-outline" id="modalBtnDataPropostaHoje" style="white-space:nowrap;">Hoje</button>
+            </div>
+          </div>
+          <div>
+            <label>Transportadora avaliada</label>
+            <input class="field-input" style="width:100%" id="modalInpTransportadora" placeholder="Ex: Rápido Log Transportes">
+          </div>
+        </div>
+        <div class="upload-grid" style="grid-template-columns:1fr;margin-top:4px;">
+          <div class="dropzone" id="modalDzProspeccao">
+            <input type="file" id="modalFileProspeccao" accept=".xls,.xlsx,.csv">
+            <svg class="dz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 8h12M6 12h12M6 16h8"/></svg>
+            <div class="dz-title">Arquivo de Prospecção</div>
+            <div class="dz-sub">Planilha preenchida pela transportadora avaliada</div>
+            <div class="dz-file" id="modalFileNameProspeccao"></div>
+          </div>
+        </div>
+        <div class="status-line" id="modalStatusProposta" style="display:none;"><span class="dot"></span><span></span></div>
+        <div style="margin-top:18px;display:flex;gap:10px;">
+          <button class="btn btn-primary" id="modalBtnProcessarProposta" disabled>Processar Proposta</button>
+          <button class="btn btn-outline" id="modalBtnCancelar">Cancelar</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- UPLOAD -->
+    <section class="page" id="page-upload">
+      <div class="page-head">
+        <div><h1>Upload</h1><p>Envie a base de frete definitivo e a proposta da transportadora. A leitura busca colunas por nome de cabeçalho, não por posição.</p></div>
+      </div>
+
+      <div class="card">
+        <h3>Frete Definitivo</h3>
+        <p class="sub">Construído a partir de dois arquivos: Arquivo de Frete + Arquivo de Torre de Controle. Envio independente da proposta.</p>
+        <div class="upload-grid">
+          <div class="dropzone" id="dzFrete">
+            <input type="file" id="fileFrete" accept=".xls,.xlsx,.csv">
+            <svg class="dz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 8h12M6 12h12M6 16h8"/></svg>
+            <div class="dz-title">Arquivo de Frete</div>
+            <div class="dz-sub">Nr CTe, Dh CTe, Transportadora, UF Origem, UF, Cidade, Vlr Nota, Vlr Total CTE, Nr Nota NFe, Componentes, M3, Peso</div>
+            <div class="dz-file" id="fileNameFrete"></div>
+          </div>
+          <div class="dropzone" id="dzTorre">
+            <input type="file" id="fileTorre" accept=".xls,.xlsx,.csv">
+            <svg class="dz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 8h12M6 12h12M6 16h8"/></svg>
+            <div class="dz-title">Arquivo de Torre de Controle</div>
+            <div class="dz-sub">Nr NFe, Dias Úteis Entrega, Vlr Nota</div>
+            <div class="dz-file" id="fileNameTorre"></div>
+          </div>
+        </div>
+        <div class="status-line" id="statusFrete"><span class="dot"></span><span>Aguardando os dois arquivos…</span></div>
+        <div style="margin-top:16px;display:flex;gap:10px;">
+          <button class="btn btn-primary" id="btnProcessarDefinitivo" disabled>Processar Frete Definitivo</button>
+          <button class="btn btn-outline" id="btnLimparDefinitivo">Limpar</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Proposta da Transportadora</h3>
+        <p class="sub">Planilha preenchida pela transportadora avaliada. Cruzamento com o Frete Definitivo já processado acima.</p>
+        <div class="field-row">
+          <div>
+            <label>Data da proposta</label>
+            <div style="display:flex;gap:8px;">
+              <input class="field-input" style="flex:1" type="date" id="inpDataProposta">
+              <button type="button" class="btn btn-outline" id="btnDataPropostaHoje" style="white-space:nowrap;">Hoje</button>
+            </div>
+          </div>
+          <div>
+            <label>Transportadora avaliada</label>
+            <input class="field-input" style="width:100%" id="inpTransportadora" placeholder="Ex: Rápido Log Transportes">
+          </div>
+        </div>
+        <div class="upload-grid" style="grid-template-columns:1fr;">
+          <div class="dropzone" id="dzProspeccao">
+            <input type="file" id="fileProspeccao" accept=".xls,.xlsx,.csv">
+            <svg class="dz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 8h12M6 12h12M6 16h8"/></svg>
+            <div class="dz-title">Proposta da Transportadora</div>
+            <div class="dz-sub">Planilha preenchida pela transportadora avaliada</div>
+            <div class="dz-file" id="fileNameProspeccao"></div>
+          </div>
+        </div>
+        <div class="status-line" id="statusProposta"><span class="dot"></span><span>Aguardando arquivo…</span></div>
+        <div style="margin-top:16px;display:flex;gap:10px;">
+          <button class="btn btn-primary" id="btnProcessarProposta" disabled>Processar Proposta</button>
+          <button class="btn btn-outline" id="btnLimparProposta">Limpar</button>
+        </div>
+      </div>
+
+      <div class="card" id="previewCard" style="display:none;">
+        <h3>Pré-visualização — <span id="previewCount"></span> linhas reconhecidas</h3>
+        <p class="sub" id="previewSub">Colunas identificadas automaticamente por nome de cabeçalho.</p>
+        <div class="table-scroll"><table id="tblPreview"><thead></thead><tbody></tbody></table></div>
+      </div>
+    </section>
+
+    <!-- SIMULAÇÃO -->
+    <section class="page" id="page-simulacao">
+      <div class="page-head">
+        <div><h1>Gerador de Simulação</h1><p>Exporta um modelo em Excel a partir do frete definitivo, com colunas sensíveis omitidas, para envio à transportadora avaliada.</p></div>
+      </div>
+      <div class="card">
+        <h3>Colunas incluídas no modelo</h3>
+        <p class="sub">Pré-preenchido a partir do Frete Definitivo já gravado no banco. Deixa em branco só o que a transportadora precisa preencher.</p>
+        <div class="legend-row" style="flex-wrap:wrap;gap:8px;">
+          <span class="var-badge down" style="background:var(--panel-2);color:var(--text);border:1px solid var(--line);">Data</span>
+          <span class="var-badge down" style="background:var(--panel-2);color:var(--text);border:1px solid var(--line);">Empresa</span>
+          <span class="var-badge down" style="background:var(--panel-2);color:var(--text);border:1px solid var(--line);">Nr CTe</span>
+          <span class="var-badge down" style="background:var(--panel-2);color:var(--text);border:1px solid var(--line);">Nr Nota</span>
+          <span class="var-badge down" style="background:var(--panel-2);color:var(--text);border:1px solid var(--line);">Valor Nota</span>
+          <span class="var-badge down" style="background:var(--panel-2);color:var(--text);border:1px solid var(--line);">Peso</span>
+          <span class="var-badge down" style="background:var(--panel-2);color:var(--text);border:1px solid var(--line);">M3</span>
+          <span class="var-badge down" style="background:var(--panel-2);color:var(--text);border:1px solid var(--line);">Peso Cubado</span>
+          <span class="var-badge down" style="background:var(--panel-2);color:var(--text);border:1px solid var(--line);">Cidade</span>
+          <span class="var-badge down" style="background:var(--panel-2);color:var(--text);border:1px solid var(--line);">UF</span>
+          <span class="var-badge down" style="background:var(--panel-2);color:var(--text);border:1px solid var(--line);">Região</span>
+          <span class="var-badge up" style="background:#fbe4de;color:var(--danger);">Prazo Entrega (branco)</span>
+          <span class="var-badge up" style="background:#fbe4de;color:var(--danger);">Valor CTe (branco)</span>
+          <span class="var-badge up" style="background:#fbe4de;color:var(--danger);">12 colunas de taxa (branco)</span>
+        </div>
+        <div style="margin-top:18px;">
+          <label>Empresa</label>
+          <select id="selSimulEmpresa" style="width:280px">
+            <option value="">Ambas (Matriz + Viana)</option>
+            <option value="Matriz">Somente Matriz</option>
+            <option value="Viana">Somente Viana</option>
+          </select>
+          <p class="sub" id="simulContagem" style="margin-top:8px;">Carregando…</p>
+        </div>
+        <div style="margin-top:16px;">
+          <button class="btn btn-primary" id="btnExportarModelo">Exportar modelo (.xlsx)</button>
+        </div>
+        <div class="status-line" id="simulStatus" style="display:none;"><span class="dot"></span><span></span></div>
+      </div>
+    </section>
+
+    <!-- CONFIGURAÇÕES -->
+    <section class="page" id="page-config">
+      <div class="page-head">
+        <div><h1>Configurações</h1><p>Ajuste as faixas de classificação de peso e faça manutenção direta nas tabelas de Frete Definitivo e Frete Prospecção.</p></div>
+      </div>
+
+      <div style="display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap;">
+        <button class="btn btn-primary configtab" data-configtab="faixas">Faixas de Peso</button>
+        <button class="btn btn-outline configtab" data-configtab="definitivo">Frete Definitivo</button>
+        <button class="btn btn-outline configtab" data-configtab="prospeccao">Frete Prospecção</button>
+      </div>
+
+      <!-- Faixas de Peso -->
+      <div class="configsub active" id="configsub-faixas">
+        <div class="card">
+          <h3>Faixas de Peso (config_faixas_peso)</h3>
+          <p class="sub">Usadas para calcular a coluna "classificação" em Frete Definitivo e Frete Prospecção.</p>
+          <div class="table-scroll">
+            <table id="tblFaixas"><thead><tr><th>Peso mín. (kg)</th><th>Peso máx. (kg)</th><th>Classificação</th><th>Ordem</th><th>Ações</th></tr></thead><tbody></tbody></table>
+          </div>
+          <button class="btn btn-outline" id="btnNovaFaixa" style="margin-top:14px;">+ Nova faixa</button>
+          <div class="status-line" id="statusFaixas" style="display:none;"><span class="dot"></span><span></span></div>
+        </div>
+      </div>
+
+      <!-- Frete Definitivo (CRUD) -->
+      <div class="configsub" id="configsub-definitivo" style="display:none;">
+        <div class="card">
+          <h3>Frete Definitivo</h3>
+          <div style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;">
+            <input class="field-input" id="buscaDefinitivo" placeholder="Buscar por Nr CTe ou Nr Nota…" style="flex:1;min-width:200px;">
+            <button class="btn btn-primary" id="btnCadastrarBaseDefinitivo">Cadastrar base</button>
+            <button class="btn btn-outline" id="btnNovoDefinitivo">+ Novo registro</button>
+            <button class="btn btn-outline" id="btnExcluirTudoDefinitivo" style="color:var(--danger);border-color:var(--danger);">Excluir tudo</button>
+          </div>
+          <div class="table-scroll"><table id="tblCrudDefinitivo"><thead></thead><tbody></tbody></table></div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px;flex-wrap:wrap;gap:10px;">
+            <span id="paginacaoInfoDefinitivo" style="font-size:12.5px;color:var(--text-dim);"></span>
+            <div style="display:flex;gap:8px;">
+              <button class="btn btn-outline" id="btnPagAnteriorDefinitivo">◀ Anterior</button>
+              <button class="btn btn-outline" id="btnPagProximaDefinitivo">Próxima ▶</button>
+            </div>
+          </div>
+          <div class="status-line" id="statusExcluirTudoDefinitivo" style="display:none;"><span class="dot"></span><span></span></div>
+        </div>
+        <div class="card" id="painelEdicaoDefinitivo" style="display:none;"></div>
+      </div>
+
+      <!-- MODAL: Cadastrar base do Frete Definitivo -->
+      <div class="modal-overlay" id="modalBaseDefinitivo" style="display:none;">
+        <div class="modal-card" style="position:relative;width:640px;">
+          <button class="modal-close" id="btnFecharModalBaseDefinitivo">&times;</button>
+          <h3>Cadastrar base — Frete Definitivo</h3>
+          <p class="sub">Envie o Arquivo de Frete e o Arquivo de Torre de Controle. Construído a partir dos dois, com envio independente da proposta.</p>
+          <div class="upload-grid" style="margin-top:16px;">
+            <div class="dropzone" id="modalDzFrete">
+              <input type="file" id="modalFileFrete" accept=".xls,.xlsx,.csv">
+              <svg class="dz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 8h12M6 12h12M6 16h8"/></svg>
+              <div class="dz-title">Arquivo de Frete</div>
+              <div class="dz-sub">Nr CTe, Dh CTe, Transportadora, UF Origem, UF, Cidade, Vlr Nota, Vlr Total CTE, Nr Nota NFe, Componentes, M3, Peso</div>
+              <div class="dz-file" id="modalFileNameFrete"></div>
+            </div>
+            <div class="dropzone" id="modalDzTorre">
+              <input type="file" id="modalFileTorre" accept=".xls,.xlsx,.csv">
+              <svg class="dz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 8h12M6 12h12M6 16h8"/></svg>
+              <div class="dz-title">Arquivo de Torre de Controle</div>
+              <div class="dz-sub">Nr NFe, Dias Úteis Entrega, Vlr Nota</div>
+              <div class="dz-file" id="modalFileNameTorre"></div>
+            </div>
+          </div>
+          <div class="status-line" id="modalStatusBaseDefinitivo" style="display:none;"><span class="dot"></span><span></span></div>
+          <div style="margin-top:18px;display:flex;gap:10px;">
+            <button class="btn btn-primary" id="modalBtnProcessarBaseDefinitivo" disabled>Processar Frete Definitivo</button>
+            <button class="btn btn-outline" id="modalBtnCancelarBaseDefinitivo">Cancelar</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Frete Prospecção (CRUD) -->
+      <div class="configsub" id="configsub-prospeccao" style="display:none;">
+        <div class="card">
+          <h3>Frete Prospecção</h3>
+          <div style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;">
+            <input class="field-input" id="buscaProspeccao" placeholder="Buscar por Nr CTe ou Nr Nota…" style="flex:1;min-width:200px;">
+            <button class="btn btn-primary" id="btnNovoProspeccao">+ Novo registro</button>
+            <button class="btn btn-outline" id="btnExcluirTudoProspeccao" style="color:var(--danger);border-color:var(--danger);">Excluir tudo</button>
+          </div>
+          <div class="table-scroll"><table id="tblCrudProspeccao"><thead></thead><tbody></tbody></table></div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px;flex-wrap:wrap;gap:10px;">
+            <span id="paginacaoInfoProspeccao" style="font-size:12.5px;color:var(--text-dim);"></span>
+            <div style="display:flex;gap:8px;">
+              <button class="btn btn-outline" id="btnPagAnteriorProspeccao">◀ Anterior</button>
+              <button class="btn btn-outline" id="btnPagProximaProspeccao">Próxima ▶</button>
+            </div>
+          </div>
+          <div class="status-line" id="statusExcluirTudoProspeccao" style="display:none;"><span class="dot"></span><span></span></div>
+        </div>
+        <div class="card" id="painelEdicaoProspeccao" style="display:none;"></div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script>
+/* ======================================================
+   CONFIGURAÇÃO SUPABASE
+   Troque pelos valores reais do seu projeto para sair do
+   modo demonstração. Em modo demonstração, o app usa dados
+   de exemplo gerados em memória (não representam dados reais).
+====================================================== */
+const SUPABASE_URL = "https://kqlywbuqxgrckqpltskt.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtxbHl3YnVxeGdyY2txcGx0c2t0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE5MjAzNjIsImV4cCI6MjEwNzQ5NjM2Mn0.qUY5VrE23KobZ2JShz_ZnTytZryMZCGxNHkI-B8ERaU";
+const DEMO_MODE = SUPABASE_URL.startsWith("SUA_");
+let sb = null;
+if(!DEMO_MODE){
+  sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+}
+document.getElementById('modeLabel').textContent = DEMO_MODE ? 'Modo demonstração' : 'Conectado ao Supabase';
+
+/* ======================================================
+   NAVEGAÇÃO
+====================================================== */
+document.querySelectorAll('.navitem').forEach(el=>{
+  el.addEventListener('click', ()=> gotoPage(el.dataset.page));
+});
+document.querySelectorAll('[data-goto]').forEach(el=>{
+  el.addEventListener('click', ()=> gotoPage(el.dataset.goto));
+});
+function gotoPage(name){
+  document.querySelectorAll('.navitem').forEach(n=>n.classList.toggle('active', n.dataset.page===name));
+  document.querySelectorAll('.page').forEach(p=>p.classList.toggle('active', p.id==='page-'+name));
+  if(name==='painel') gotoJanela('visaogeral');
+  if(name==='simulacao') atualizarContagemSimulacao();
+  if(name==='config') renderFaixas();
+}
+
+/* --- Janelas dentro do Painel (estilo abas de navegador) --- */
+function gotoJanela(nome){
+  document.querySelectorAll('.painel-tab').forEach(t=> t.classList.toggle('active', t.dataset.janela===nome));
+  document.querySelectorAll('.painel-janela').forEach(j=> j.style.display = (j.id==='janela-'+nome) ? 'block' : 'none');
+  if(nome==='visaogeral') carregarVisaoGeralDoBanco();
+  if(nome==='comparativo') renderDashboard();
+}
+document.querySelectorAll('.painel-tab').forEach(tab=>{
+  tab.addEventListener('click', ()=> gotoJanela(tab.dataset.janela));
+});
+
+/* ======================================================
+   LEITURA FLEXÍVEL DE PLANILHAS (SheetJS)
+   Busca colunas por nome de cabeçalho ao invés de posição.
+====================================================== */
+function normalize(s){ return String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim(); }
+
+// Casamento por igualdade exata primeiro (evita "uf" casar com "uf origem"),
+// só cai para correspondência parcial (includes) se não achar igualdade.
+function matchHeaderExact(headerRow, map){
+  const norm = headerRow.map(normalize);
+  const out = {};
+  for(const key in map){
+    let idx = norm.findIndex(h => map[key].some(alias => h === alias));
+    if(idx < 0) idx = norm.findIndex(h => map[key].some(alias => h.includes(alias)));
+    out[key] = idx;
+  }
+  return out;
+}
+
+// Escolhe a linha de cabeçalho testando as primeiras linhas contra o
+// map de colunas esperado, e ficando com a que mais bate — em vez de
+// assumir cegamente que é a primeira linha não-vazia (planilhas com
+// título/logo antes do cabeçalho real quebravam essa suposição).
+function acharLinhaCabecalho(rows, headerMap, maxLinhas){
+  maxLinhas = maxLinhas || 15;
+  const aliasesTodos = headerMap ? Object.values(headerMap).flat() : [];
+  let melhorIdx = -1, melhorScore = 0;
+  for(let i=0; i<Math.min(rows.length, maxLinhas); i++){
+    const r = rows[i];
+    if(!r || !r.some(c=>String(c).trim()!=='')) continue;
+    if(melhorIdx===-1) melhorIdx = i; // fallback: primeira linha não-vazia
+    if(!aliasesTodos.length) continue;
+    const norm = r.map(normalize);
+    const score = aliasesTodos.reduce((acc,alias)=> acc + (norm.some(h=>h===alias) ? 1 : 0), 0);
+    if(score > melhorScore){ melhorScore = score; melhorIdx = i; }
+  }
+  return melhorIdx;
+}
+
+function readRawSheet(file, headerMap){
+  return new Promise((resolve,reject)=>{
+    const reader = new FileReader();
+    reader.onload = e=>{
+      // Yield ao browser antes do parse pesado, pra "Lendo..." aparecer na tela.
+      setTimeout(()=>{
+        try{
+          // ArrayBuffer + raw:true é bem mais rápido que binary string + raw:false
+          // para planilhas grandes (~50k linhas) — evita converter cada célula pra string.
+          const wb = XLSX.read(e.target.result, {type:'array', raw:true, cellDates:true, cellText:false});
+          const ws = wb.Sheets[wb.SheetNames[0]];
+          const rows = XLSX.utils.sheet_to_json(ws, {header:1, raw:true, defval:''});
+          const headerRowIdx = acharLinhaCabecalho(rows, headerMap);
+          if(headerRowIdx < 0){ resolve({headers:[], body:[]}); return; }
+          const headers = rows[headerRowIdx];
+          const body = rows.slice(headerRowIdx+1).filter(r => r && r.some(c=>String(c).trim()!==''));
+          resolve({headers, body});
+        }catch(err){ reject(err); }
+      }, 0);
+    };
+    reader.onerror = reject;
+    reader.readAsArrayBuffer(file);
+  });
+}
+function num(v){ return typeof v==='number' ? v : (parseFloat(String(v??'').replace(/\./g,'').replace(',','.'))||0); }
+function numSimples(v){ return typeof v==='number' ? v : (parseFloat(String(v??'').replace(',','.'))||0); }
+function toDateStr(v){
+  if(v instanceof Date) return v.toISOString().slice(0,10);
+  if(typeof v==='number' && window.XLSX && XLSX.SSF){
+    const d = XLSX.SSF.parse_date_code(v);
+    if(d) return `${d.y}-${String(d.m).padStart(2,'0')}-${String(d.d).padStart(2,'0')}`;
+  }
+  return v ?? '';
+}
+
+/* --- Arquivo de Frete --- */
+const HEADER_MAP_FRETE = {
+  cte: ['nr cte'],
+  dataCte: ['dh cte'],
+  transportadora: ['transportadora'],
+  ufOrigem: ['uf origem'],
+  uf: ['uf'],
+  cidade: ['cidade'],
+  vlrNota: ['vlr nota'],
+  vlrTotalCte: ['vlr total cte'],
+  nrNotaNfe: ['nr nota nfe'],
+  componentes: ['componentes'],
+  m3: ['m3'],
+  peso: ['peso']
+};
+async function parseArquivoFrete(file){
+  const {headers, body} = await readRawSheet(file, HEADER_MAP_FRETE);
+  const map = matchHeaderExact(headers, HEADER_MAP_FRETE);
+  return body.map(r=>({
+    cte: map.cte>=0 ? String(r[map.cte]).trim() : '',
+    dataCte: map.dataCte>=0 ? toDateStr(r[map.dataCte]) : '',
+    transportadora: map.transportadora>=0 ? String(r[map.transportadora]).trim() : '',
+    ufOrigem: map.ufOrigem>=0 ? String(r[map.ufOrigem]).trim().toUpperCase() : '',
+    uf: map.uf>=0 ? String(r[map.uf]).trim().toUpperCase() : '',
+    cidade: map.cidade>=0 ? r[map.cidade] : '',
+    vlrNota: map.vlrNota>=0 ? numSimples(r[map.vlrNota]) : 0,
+    vlrTotalCte: map.vlrTotalCte>=0 ? numSimples(r[map.vlrTotalCte]) : 0,
+    nrNotaNfe: map.nrNotaNfe>=0 ? String(r[map.nrNotaNfe]) : '',
+    componentes: map.componentes>=0 ? String(r[map.componentes]) : '',
+    m3: map.m3>=0 ? numSimples(r[map.m3]) : 0,
+    peso: map.peso>=0 ? numSimples(r[map.peso]) : 0
+  }));
+}
+
+/* --- Arquivo de Torre de Controle --- */
+const HEADER_MAP_TORRE = {
+  nfe: ['nr nfe'],
+  diasUteis: ['dias uteis entrega'],
+  vlrNota: ['vlr nota']
+};
+async function parseArquivoTorre(file){
+  const {headers, body} = await readRawSheet(file, HEADER_MAP_TORRE);
+  const map = matchHeaderExact(headers, HEADER_MAP_TORRE);
+  return body.map(r=>({
+    nfe: map.nfe>=0 ? String(r[map.nfe]).trim() : '',
+    diasUteis: map.diasUteis>=0 ? String(r[map.diasUteis]).trim() : '',
+    vlrNota: map.vlrNota>=0 ? numSimples(r[map.vlrNota]) : 0
+  }));
+}
+
+/* --- Proposta da Transportadora (arquivo genérico, formato ainda a confirmar) --- */
+// Arquivo de Prospecção — cada taxa já vem em coluna própria (sem string
+// combinada), cópia direta. Ver Arquivos_de_Prospecção_e_tabela_frete.docx.
+const HEADER_MAP_PROSPECCAO = {
+  data: ['data'],
+  empresa: ['empresa'],
+  nrCte: ['nr cte'],
+  nrNota: ['nr nota'],
+  valorNota: ['valor nota'],
+  peso: ['peso'],
+  m3: ['m3'],
+  pesoCubado: ['peso cubado'],
+  cidade: ['cidade'],
+  uf: ['uf'],
+  regiao: ['regiao'],
+  prazoEntrega: ['prazo entrega'],
+  valorCte: ['valor cte'],
+  fretePeso: ['frete peso'],
+  gris: ['gris'],
+  advalorem: ['advalorem','advaloem'],
+  pedagio: ['pedagio'],
+  tas: ['tas'],
+  emex: ['emex'],
+  trt: ['trt'],
+  suframa: ['suframa'],
+  seguroFluvial: ['seguro fluvial'],
+  redespachoFluvial: ['redespacho fluvial'],
+  taxaDespacho: ['taxa despacho','taxa de despacho'],
+  generalidades: ['generalidades']
+};
+// Colunas obrigatórias no Arquivo de Prospecção preenchido (o resto é opcional)
+const CAMPOS_OBRIGATORIOS_PROSPECCAO = ['data','empresa','nrCte','nrNota','valorNota','peso','m3','pesoCubado','cidade','uf','regiao','prazoEntrega','valorCte'];
+
+async function parseProspeccao(file){
+  const {headers, body} = await readRawSheet(file, HEADER_MAP_PROSPECCAO);
+  const map = matchHeaderExact(headers, HEADER_MAP_PROSPECCAO);
+  const colunasObrigatoriasAusentes = CAMPOS_OBRIGATORIOS_PROSPECCAO.filter(c => map[c]<0);
+  const linhas = body.map(r=>{
+    const get = (campo, fn) => map[campo]>=0 ? fn(r[map[campo]]) : (fn===numSimples ? 0 : '');
+    return {
+      data: get('data', toDateStr),
+      empresa: get('empresa', v=>String(v||'').trim()),
+      nrCte: get('nrCte', v=>String(v||'').trim()),
+      nrNota: get('nrNota', v=>String(v||'').trim()),
+      valorNota: get('valorNota', numSimples),
+      peso: get('peso', numSimples),
+      m3: get('m3', numSimples),
+      pesoCubado: get('pesoCubado', numSimples),
+      cidade: get('cidade', v=>String(v||'').trim()),
+      uf: get('uf', v=>String(v||'').trim().toUpperCase()),
+      regiao: get('regiao', v=>String(v||'').trim()),
+      prazoEntrega: get('prazoEntrega', numSimples),
+      valorCte: get('valorCte', numSimples),
+      fretePeso: get('fretePeso', numSimples),
+      gris: get('gris', numSimples),
+      advalorem: get('advalorem', numSimples),
+      pedagio: get('pedagio', numSimples),
+      tas: get('tas', numSimples),
+      emex: get('emex', numSimples),
+      trt: get('trt', numSimples),
+      suframa: get('suframa', numSimples),
+      seguroFluvial: get('seguroFluvial', numSimples),
+      redespachoFluvial: get('redespachoFluvial', numSimples),
+      taxaDespacho: get('taxaDespacho', numSimples),
+      generalidades: get('generalidades', numSimples)
+    };
+  });
+  linhas._colunasObrigatoriasAusentes = colunasObrigatoriasAusentes; // lido pelo dropzone pra avisar o usuário
+  return linhas;
+}
+
+
+/* --- De-para da coluna "Componentes" ---
+   Formato observado: "EMEX: 24,78; FRETE PESO: 61,92; GRIS: 22,16; ..."
+   ATENÇÃO: os alvos marcados com (*) são melhor-suposição — confirme com o Samuel:
+/* --- De-para real de "Componentes" (espelho de config_mapeamento_taxas) ---
+   A Edge Function de produção (edge.txt) já faz esse de-para consultando a
+   tabela ao vivo. Este objeto só existe para o MODO DEMONSTRAÇÃO simular o
+   mesmo resultado sem banco — é uma cópia fiel do seed enviado (q1.txt). */
+const DEMO_CONFIG_TAXAS = {
+  'AD VALOREM':'advalorem','ADEME':'gris','DESPACHO':'taxa_despacho','DESPACHO FIXO':'taxa_despacho',
+  'EMEX':'emex','EMEX-ENTREGA':'emex','ENTREGA (TDE)':'tas','F PESO':'frete_peso','F PESO EXCEDEN':'frete_peso',
+  'F. PESO':'frete_peso','F. PESO EXCEDEN':'frete_peso','F. VALOR FIXO':'frete_peso','FRETE PERCENT':'frete_peso',
+  'FRETE PESO':'frete_peso','FRETE VALOR':'frete_peso','GRIS':'gris','GRIS.':'gris','GRIS/ADEME':'gris',
+  'ICMS':'generalidades','IMP REPASSADO':'generalidades','IMPOSTO':'generalidades','OUTROS':'generalidades',
+  'OUTROS VALORES':'generalidades','PEDAGIO':'pedagio','PEDÁGIO':'pedagio','PEDAGIO KG':'pedagio','POS':'generalidades',
+  'SECCAT':'generalidades','SEG OBRIGATORIO':'generalidades','SEGURO':'generalidades','TAG':'generalidades','TAS':'tas',
+  'TAXA QUIMICO':'generalidades','TAXAS':'generalidades','TDA':'tas','TDE':'tas','TRT':'trt','TSO':'generalidades',
+  'TSO TAXSEGOBR':'generalidades','TX CTRC':'taxa_despacho','TX MERCADO':'generalidades','TX PEDAGIO':'pedagio',
+  'TXE':'taxa_despacho','VALOR GRIS':'gris'
+};
+const DEMO_CONFIG_REGIOES = {
+  AC:'Norte',AL:'Nordeste',AP:'Norte',AM:'Norte',BA:'Nordeste',CE:'Nordeste',DF:'Centro-Oeste',ES:'Sudeste',
+  GO:'Centro-Oeste',MA:'Nordeste',MT:'Centro-Oeste',MS:'Centro-Oeste',MG:'Sudeste',PA:'Norte',PB:'Nordeste',
+  PR:'Sul',PE:'Nordeste',PI:'Nordeste',RJ:'Sudeste',RN:'Nordeste',RS:'Sul',RO:'Norte',RR:'Norte',SC:'Sul',
+  SP:'Sudeste',SE:'Nordeste',TO:'Norte'
+};
+function parseComponentesDemo(str){
+  const out = {frete_peso:0,gris:0,advalorem:0,pedagio:0,tas:0,emex:0,trt:0,suframa:0,
+    seguro_fluvial:0,redespacho_fluvial:0,taxa_despacho:0,generalidades:0};
+  String(str||'').split(';').forEach(piece=>{
+    const idx = piece.indexOf(':');
+    if(idx<0) return;
+    const nome = piece.slice(0,idx).trim().toUpperCase();
+    const valor = numSimples(piece.slice(idx+1));
+    const destino = DEMO_CONFIG_TAXAS[nome] || 'generalidades';
+    out[destino] = (out[destino]||0) + valor;
+  });
+  return out;
+}
+
+/* --- Regras de negócio --- */
+const FATOR_CUBAGEM = 300; // espelha config_cubagem_pesos.fator_cubagem (real: coluna gerada no Postgres)
+// Espelho local de config_faixas_peso, usado só em DEMO_MODE — agora mutável
+// (a aba Configurações edita esse array em tempo real).
+let demoFaixasPeso = [
+  {id:'f1', peso_min:0, peso_max:50, classificacao:'0–50kg', ordem:1},
+  {id:'f2', peso_min:50, peso_max:100, classificacao:'50–100kg', ordem:2},
+  {id:'f3', peso_min:100, peso_max:300, classificacao:'100–300kg', ordem:3},
+  {id:'f4', peso_min:300, peso_max:1000, classificacao:'300–1000kg', ordem:4},
+  {id:'f5', peso_min:1000, peso_max:null, classificacao:'1000kg+', ordem:5}
+];
+function faixaDe(peso){
+  const ordenadas = [...demoFaixasPeso].sort((a,b)=>a.ordem-b.ordem);
+  const f = ordenadas.find(f=> peso>=f.peso_min && (f.peso_max==null || peso<f.peso_max));
+  return f ? f.classificacao : null;
+}
+function empresaDeUfOrigem(uf){ return uf==='ES' ? 'Viana' : 'Matriz'; }
+function primeiraNota(str){ return (String(str||'').split(',')[0]||'').trim() || '0'; }
+
+/* --- Monta os ITEMS no formato que a Edge Function real (edge.txt) espera:
+   { data, nr_cte, nr_nota_string, valor_nota, peso, m3, cidade, uf,
+     prazo_entrega, valor_cte, componentes_string }
+   O prazo_entrega precisa ser resolvido AQUI (cliente) porque só o
+   navegador tem acesso ao Arquivo de Torre de Controle — a Edge Function
+   não recebe esse arquivo, só o item já com prazo_entrega pronto. */
+function montarItensFrete(rowsFrete, rowsTorre){
+  const torreByNfe = new Map(rowsTorre.map(t=>[t.nfe, t]));
+  return rowsFrete.map(r=>{
+    const notaChave = primeiraNota(r.nrNotaNfe);
+    const torre = torreByNfe.get(notaChave);
+    return {
+      data: r.dataCte || null,
+      nr_cte: r.cte,
+      nr_nota_string: r.nrNotaNfe,
+      valor_nota: r.vlrNota,
+      peso: r.peso,
+      m3: r.m3,
+      cidade: r.cidade,
+      uf: r.uf,
+      prazo_entrega: torre ? (parseInt(String(torre.diasUteis).replace(/\D/g,''),10)||0) : 0,
+      valor_cte: r.vlrTotalCte,
+      componentes_string: r.componentes,
+      // Agora existem de verdade em frete_definitivo (schema reconstruído).
+      empresa: empresaDeUfOrigem(r.ufOrigem),
+      transportadora: r.transportadora
+    };
+  });
+}
+function montarItensProspeccao(rowsProspeccao, nomeProposta, transportadora){
+  return rowsProspeccao.map(r=>({
+    nome_proposta: nomeProposta,
+    transportadora: transportadora,
+    data: r.data || null,
+    empresa: r.empresa || null,
+    nr_cte: r.nrCte,
+    nr_nota: r.nrNota,
+    valor_nota: r.valorNota,
+    peso: r.peso,
+    m3: r.m3,
+    peso_cubado: r.pesoCubado,
+    cidade: r.cidade,
+    uf: r.uf,
+    regiao: r.regiao,
+    prazo_entrega: r.prazoEntrega,
+    valor_cte: r.valorCte,
+    frete_peso: r.fretePeso, gris: r.gris, advalorem: r.advalorem, pedagio: r.pedagio,
+    tas: r.tas, emex: r.emex, trt: r.trt, suframa: r.suframa,
+    seguro_fluvial: r.seguroFluvial, redespacho_fluvial: r.redespachoFluvial,
+    taxa_despacho: r.taxaDespacho, generalidades: r.generalidades
+  }));
+}
+
+/* ======================================================
+   ESTADO EM MEMÓRIA (usado tanto em demo quanto como cache)
+====================================================== */
+let stateArquivoFrete = [];
+let stateArquivoTorre = [];
+let stateDefinitivo = [];   // items no formato da Edge Function (ver montarItensFrete)
+let stateProspeccao = [];
+let prospeccoesCadastradas = []; // {id, nomeProposta, transportadora, data, cruzadas, custoDef, custoProp}
+// Espelho local das tabelas reais, usado só em DEMO_MODE (sem banco real)
+let demoFreteDefinitivo = [];
+let demoFreteProspeccao = [];
+
+
+/* ======================================================
+   UPLOAD — interações de UI
+====================================================== */
+function setupDropzone(inputId, dzId, labelId, statusId, parseFn, onLoaded){
+  const input = document.getElementById(inputId);
+  const dz = document.getElementById(dzId);
+  const label = document.getElementById(labelId);
+  input.addEventListener('change', async ()=>{
+    const f = input.files[0];
+    if(!f) return;
+    label.textContent = f.name;
+    dz.classList.add('filled');
+    setStatus(statusId, 'Lendo "'+f.name+'"…', null);
+    try{
+      const t0 = performance.now();
+      const data = await parseFn(f);
+      const ms = Math.round(performance.now()-t0);
+      setStatus(statusId, data.length+' linhas reconhecidas em "'+f.name+'" ('+ms+'ms).', true);
+      onLoaded(data);
+    }catch(err){
+      setStatus(statusId, 'Erro ao ler o arquivo: '+err.message, false);
+    }
+  });
+}
+function setStatus(elId, text, ok){
+  const el = document.getElementById(elId);
+  el.className = 'status-line' + (ok===true?' ok':ok===false?' err':'');
+  el.querySelector('span:last-child').textContent = text;
+}
+
+/* Cada arquivo é lido de forma independente assim que selecionado —
+   não espera o par pra dar feedback. O botão de cada quadrante só
+   habilita quando os arquivos daquele quadrante estiverem prontos. */
+setupDropzone('fileFrete','dzFrete','fileNameFrete','statusFrete', parseArquivoFrete, d=>{
+  stateArquivoFrete = d;
+  checkReadyDefinitivo();
+});
+setupDropzone('fileTorre','dzTorre','fileNameTorre','statusFrete', parseArquivoTorre, d=>{
+  stateArquivoTorre = d;
+  checkReadyDefinitivo();
+});
+setupDropzone('fileProspeccao','dzProspeccao','fileNameProspeccao','statusProposta', parseProspeccao, d=>{
+  stateProspeccao = d;
+  showPreview(d, 'Proposta', ['nrCte','nrNota','data','empresa','uf','peso','pesoCubado','valorCte','prazoEntrega']);
+  if(d._colunasObrigatoriasAusentes && d._colunasObrigatoriasAusentes.length){
+    setStatus('statusProposta', 'Atenção: colunas obrigatórias não encontradas no arquivo: '+d._colunasObrigatoriasAusentes.join(', '), false);
+  }
+  checkReadyProposta();
+});
+
+function checkReadyDefinitivo(){
+  document.getElementById('btnProcessarDefinitivo').disabled = !(stateArquivoFrete.length && stateArquivoTorre.length);
+}
+function checkReadyProposta(){
+  // Não depende de stateDefinitivo: o cruzamento acontece contra o banco
+  // (ou o espelho demo), não contra o que foi processado nesta sessão.
+  document.getElementById('btnProcessarProposta').disabled = !(stateProspeccao.length
+    && document.getElementById('inpTransportadora').value.trim() && document.getElementById('inpDataProposta').value.trim());
+}
+document.getElementById('inpTransportadora').addEventListener('input', checkReadyProposta);
+document.getElementById('inpDataProposta').addEventListener('input', checkReadyProposta);
+document.getElementById('inpDataProposta').addEventListener('change', checkReadyProposta);
+document.getElementById('btnDataPropostaHoje').addEventListener('click', ()=>{
+  const hoje = new Date();
+  const iso = hoje.getFullYear()+'-'+String(hoje.getMonth()+1).padStart(2,'0')+'-'+String(hoje.getDate()).padStart(2,'0');
+  document.getElementById('inpDataProposta').value = iso;
+  checkReadyProposta();
+});
+
+function showPreview(data, label, cols){
+  const card = document.getElementById('previewCard');
+  card.style.display='block';
+  document.getElementById('previewCount').textContent = data.length+' ('+label+')';
+  document.getElementById('previewSub').textContent = label==='Frete Definitivo'
+    ? 'Item por linha, no formato enviado à Edge Function index-correlacao (nr_nota_string ainda não separada — isso é feito no servidor). Exibindo as 8 primeiras.'
+    : 'Colunas identificadas automaticamente por nome de cabeçalho. Exibindo as 8 primeiras.';
+  const thead = document.querySelector('#tblPreview thead');
+  const tbody = document.querySelector('#tblPreview tbody');
+  thead.innerHTML = '<tr>'+cols.map(c=>'<th>'+c+'</th>').join('')+'</tr>';
+  tbody.innerHTML = data.slice(0,8).map(r=>'<tr>'+cols.map(c=>{
+    const v = r[c];
+    const fmt = typeof v==='number' ? v.toFixed(2) : (v??'');
+    return '<td class="mono">'+fmt+'</td>';
+  }).join('')+'</tr>').join('');
+}
+
+document.getElementById('btnLimparDefinitivo').addEventListener('click', ()=>{
+  stateArquivoFrete=[]; stateArquivoTorre=[]; stateDefinitivo=[];
+  ['fileFrete','fileTorre'].forEach(id=>document.getElementById(id).value='');
+  ['dzFrete','dzTorre'].forEach(id=>document.getElementById(id).classList.remove('filled'));
+  document.getElementById('fileNameFrete').textContent='';
+  document.getElementById('fileNameTorre').textContent='';
+  document.getElementById('previewCard').style.display='none';
+  setStatus('statusFrete','Aguardando os dois arquivos…', null);
+  checkReadyDefinitivo(); checkReadyProposta();
+});
+document.getElementById('btnLimparProposta').addEventListener('click', ()=>{
+  stateProspeccao=[];
+  document.getElementById('fileProspeccao').value='';
+  document.getElementById('dzProspeccao').classList.remove('filled');
+  document.getElementById('fileNameProspeccao').textContent='';
+  setStatus('statusProposta','Aguardando arquivo…', null);
+  checkReadyProposta();
+});
+
+/* ======================================================
+   PROCESSAMENTO — espelha exatamente a Edge Function real (edge.txt):
+   de-para de taxas via config_mapeamento_taxas, região via config_regioes,
+   primeira nota como chave, peso_cubado/pct_frete/custo_kg calculados
+   (no Postgres real isso são colunas GERADAS — nunca são inseridas).
+====================================================== */
+function processarDefinitivoDemo(items){
+  return items.map(item=>{
+    const notaChave = primeiraNota(item.nr_nota_string);
+    const regiao = DEMO_CONFIG_REGIOES[(item.uf||'').toUpperCase()] || 'Outros';
+    const comp = parseComponentesDemo(item.componentes_string);
+    const pesoCubado = Math.max(item.peso||0, (item.m3||0)*FATOR_CUBAGEM);
+    return {
+      data: item.data || new Date().toISOString().slice(0,10),
+      nr_cte: item.nr_cte, nr_nota: notaChave,
+      valor_nota: item.valor_nota||0, peso: item.peso||0, m3: item.m3||0,
+      cidade: item.cidade, uf: (item.uf||'').toUpperCase(), regiao,
+      prazo_entrega: item.prazo_entrega||0, valor_cte: item.valor_cte||0,
+      ...comp,
+      peso_cubado: pesoCubado,
+      classificacao: faixaDe(pesoCubado),
+      perc_frete: item.valor_nota ? (item.valor_cte/item.valor_nota*100) : 0,
+      custo_kg: pesoCubado ? (item.valor_cte/pesoCubado) : 0,
+      empresa: item.empresa||null, transportadora: item.transportadora||null
+    };
+  });
+}
+// Arquivo de Prospecção: cópia direta, sem de-para — mesma lógica da Edge Function real.
+function processarProspeccaoDemo(items){
+  return items.map(item=>{
+    const pesoCubado = item.peso_cubado||0;
+    return {
+      nome_proposta: item.nome_proposta, transportadora: item.transportadora,
+      data: item.data||null, empresa: item.empresa||null, nr_cte: item.nr_cte, nr_nota: item.nr_nota,
+      valor_nota: item.valor_nota||0, peso: item.peso||0, m3: item.m3||0,
+      peso_cubado: pesoCubado, classificacao: faixaDe(pesoCubado),
+      cidade: item.cidade, uf: (item.uf||'').toUpperCase(), regiao: item.regiao||null,
+      prazo_entrega: item.prazo_entrega||0, valor_cte: item.valor_cte||0,
+      perc_frete: item.valor_nota ? (item.valor_cte/item.valor_nota*100) : 0,
+      custo_kg: pesoCubado ? (item.valor_cte/pesoCubado) : 0,
+      frete_peso: item.frete_peso||0, gris: item.gris||0, advalorem: item.advalorem||0,
+      pedagio: item.pedagio||0, tas: item.tas||0, emex: item.emex||0, trt: item.trt||0,
+      suframa: item.suframa||0, seguro_fluvial: item.seguro_fluvial||0,
+      redespacho_fluvial: item.redespacho_fluvial||0, taxa_despacho: item.taxa_despacho||0,
+      generalidades: item.generalidades||0
+    };
+  });
+}
+
+// Chama a Edge Function real "index-correlacao" — payload {items, tipo}.
+// Em DEMO_MODE, simula o mesmo resultado localmente. Em modo real, quebra em
+// LOTES: mandar 50k itens de uma vez estoura o limite de CPU/memória do
+// Deno Edge Runtime (WORKER_RESOURCE_LIMIT).
+const LOTE_EDGE_FUNCTION = 300;
+async function chamarEdgeFunctionProcessarFrete(items, tipo, statusId){
+  if(DEMO_MODE){
+    await new Promise(r=>setTimeout(r,300));
+    if(tipo==='definitivo'){
+      const registros = processarDefinitivoDemo(items);
+      const chave = r => r.nr_cte+'|'+r.nr_nota;
+      const existentes = new Map(demoFreteDefinitivo.map(r=>[chave(r), r]));
+      registros.forEach(r=> existentes.set(chave(r), r));
+      demoFreteDefinitivo = [...existentes.values()];
+      return { success:true, count: registros.length };
+    }else{
+      const registros = processarProspeccaoDemo(items);
+      demoFreteProspeccao.push(...registros);
+      return { success:true, count: registros.length };
+    }
+  }
+  let totalGravado = 0;
+  const totalLotes = Math.ceil(items.length / LOTE_EDGE_FUNCTION) || 1;
+  for(let i=0; i<items.length; i+=LOTE_EDGE_FUNCTION){
+    const lote = items.slice(i, i+LOTE_EDGE_FUNCTION);
+    const numeroLote = Math.floor(i/LOTE_EDGE_FUNCTION)+1;
+    if(statusId) setStatus(statusId, `Enviando lote ${numeroLote}/${totalLotes} (${lote.length} itens)…`, null);
+    const { data, error } = await sb.functions.invoke('index-correlacao', { body: { items: lote, tipo } });
+    if(error){
+      console.error('Erro no processamento (lote '+numeroLote+'):', error);
+      throw new Error('lote '+numeroLote+'/'+totalLotes+' falhou: '+error.message);
+    }
+    totalGravado += data?.count ?? lote.length;
+  }
+  return { success:true, count: totalGravado };
+}
+
+// Conta quantas notas da proposta casaram com o Frete Definitivo
+// (a Edge Function real não devolve esse número — ela só confirma o insert).
+async function contarCruzadas(nomeProposta){
+  if(DEMO_MODE){
+    const defNotas = new Set(demoFreteDefinitivo.map(r=>r.nr_nota));
+    return demoFreteProspeccao.filter(r=>r.nome_proposta===nomeProposta && defNotas.has(r.nr_nota)).length;
+  }
+  const { data, error } = await sb.from('vw_analise_comparativa_regiao_uf')
+    .select('total_ctes_enviados').eq('nome_proposta', nomeProposta);
+  if(error){ console.error(error); return 0; }
+  return (data||[]).reduce((a,r)=>a+(r.total_ctes_enviados||0),0);
+}
+
+/* ======================================================
+   PROCESSAR FRETE DEFINITIVO (quadrante 1 — envio independente)
+====================================================== */
+document.getElementById('btnProcessarDefinitivo').addEventListener('click', async ()=>{
+  const btn = document.getElementById('btnProcessarDefinitivo');
+  btn.disabled = true; btn.textContent = 'Processando…';
+  setStatus('statusFrete', 'Montando itens a partir de '+stateArquivoFrete.length+' linhas…', null);
+  await new Promise(r=>setTimeout(r,20)); // yield antes do processamento pesado (~50k linhas)
+  try{
+    const t0 = performance.now();
+    stateDefinitivo = montarItensFrete(stateArquivoFrete, stateArquivoTorre);
+    const ms = Math.round(performance.now()-t0);
+    showPreview(stateDefinitivo, 'Frete Definitivo',
+      ['nr_cte','nr_nota_string','data','empresa','uf','peso','valor_cte','prazo_entrega']);
+    setStatus('statusFrete', 'Enviando '+stateDefinitivo.length+' itens para a Edge Function…', null);
+    const res = await chamarEdgeFunctionProcessarFrete(stateDefinitivo, 'definitivo', 'statusFrete');
+    setStatus('statusFrete', (res.count ?? stateDefinitivo.length)+' linhas gravadas em frete_definitivo ('+ms+'ms de processamento local).', true);
+  }catch(err){
+    setStatus('statusFrete', 'Falha ao processar Frete Definitivo: '+err.message, false);
+  }
+  btn.textContent = 'Processar Frete Definitivo';
+  checkReadyProposta();
+});
+
+/* ======================================================
+   PROCESSAR PROPOSTA (quadrante 2 — grava direto em frete_prospeccao,
+   nome_proposta/transportadora embutidos em cada linha)
+====================================================== */
+document.getElementById('btnProcessarProposta').addEventListener('click', async ()=>{
+  const btn = document.getElementById('btnProcessarProposta');
+  btn.disabled = true; btn.textContent = 'Processando…';
+  await new Promise(r=>setTimeout(r,20));
+  const dataProposta = document.getElementById('inpDataProposta').value;
+  const transportadora = document.getElementById('inpTransportadora').value.trim();
+  try{
+    const itensProposta = montarItensProspeccao(stateProspeccao, dataProposta, transportadora);
+    const res = await chamarEdgeFunctionProcessarFrete(itensProposta, 'prospeccao', 'statusProposta');
+    const cruzadas = await contarCruzadas(dataProposta);
+    prospeccoesCadastradas.push({ nomeProposta: dataProposta, transportadora, cruzadas });
+    setStatus('statusProposta', (res.count ?? itensProposta.length)+' linhas gravadas em frete_prospeccao — '+cruzadas+' CTes cruzaram com o Frete Definitivo.', true);
+    renderOverview();
+    populateProspeccaoFilters();
+  }catch(err){
+    setStatus('statusProposta', 'Falha no processamento: '+err.message, false);
+  }
+  btn.textContent = 'Processar Proposta';
+  checkReadyProposta();
+});
+
+/* ======================================================
+   MODAL "Adicionar Proposta" (janela Visão Geral do Painel)
+   Reaproveita parseProspeccao / montarItensProspeccao / chamarEdgeFunctionProcessarFrete
+   / contarCruzadas — mesma lógica do quadrante Proposta em Upload, com
+   estado próprio pra não interferir com aquela aba.
+====================================================== */
+let modalStateProspeccao = [];
+function abrirModalProposta(){
+  document.getElementById('modalProposta').style.display = 'flex';
+  document.getElementById('modalInpDataProposta').value = '';
+  document.getElementById('modalInpTransportadora').value = '';
+  document.getElementById('modalFileProspeccao').value = '';
+  document.getElementById('modalDzProspeccao').classList.remove('filled');
+  document.getElementById('modalFileNameProspeccao').textContent = '';
+  document.getElementById('modalStatusProposta').style.display = 'none';
+  modalStateProspeccao = [];
+  checkReadyModalProposta();
+}
+function fecharModalProposta(){ document.getElementById('modalProposta').style.display = 'none'; }
+document.getElementById('btnAdicionarProposta').addEventListener('click', abrirModalProposta);
+document.getElementById('btnFecharModalProposta').addEventListener('click', fecharModalProposta);
+document.getElementById('modalBtnCancelar').addEventListener('click', fecharModalProposta);
+document.getElementById('modalProposta').addEventListener('click', e=>{ if(e.target.id==='modalProposta') fecharModalProposta(); });
+
+document.getElementById('modalBtnDataPropostaHoje').addEventListener('click', ()=>{
+  const hoje = new Date();
+  document.getElementById('modalInpDataProposta').value =
+    hoje.getFullYear()+'-'+String(hoje.getMonth()+1).padStart(2,'0')+'-'+String(hoje.getDate()).padStart(2,'0');
+  checkReadyModalProposta();
+});
+function checkReadyModalProposta(){
+  document.getElementById('modalBtnProcessarProposta').disabled = !(modalStateProspeccao.length
+    && document.getElementById('modalInpTransportadora').value.trim()
+    && document.getElementById('modalInpDataProposta').value.trim());
+}
+document.getElementById('modalInpTransportadora').addEventListener('input', checkReadyModalProposta);
+document.getElementById('modalInpDataProposta').addEventListener('input', checkReadyModalProposta);
+
+setupDropzone('modalFileProspeccao','modalDzProspeccao','modalFileNameProspeccao','modalStatusProposta', parseProspeccao, d=>{
+  modalStateProspeccao = d;
+  if(d._colunasObrigatoriasAusentes && d._colunasObrigatoriasAusentes.length){
+    setStatus('modalStatusProposta', 'Atenção: colunas obrigatórias não encontradas: '+d._colunasObrigatoriasAusentes.join(', '), false);
+  }
+  checkReadyModalProposta();
+});
+
+document.getElementById('modalBtnProcessarProposta').addEventListener('click', async ()=>{
+  const btn = document.getElementById('modalBtnProcessarProposta');
+  btn.disabled = true; btn.textContent = 'Processando…';
+  await new Promise(r=>setTimeout(r,20));
+  const dataProposta = document.getElementById('modalInpDataProposta').value;
+  const transportadora = document.getElementById('modalInpTransportadora').value.trim();
+  try{
+    const itensProposta = montarItensProspeccao(modalStateProspeccao, dataProposta, transportadora);
+    const res = await chamarEdgeFunctionProcessarFrete(itensProposta, 'prospeccao', 'modalStatusProposta');
+    const cruzadas = await contarCruzadas(dataProposta);
+    prospeccoesCadastradas.push({ nomeProposta: dataProposta, transportadora, cruzadas });
+    setStatus('modalStatusProposta', (res.count ?? itensProposta.length)+' linhas gravadas — '+cruzadas+' CTes cruzaram.', true);
+    renderOverview();
+    populateProspeccaoFilters();
+    setTimeout(fecharModalProposta, 1200);
+  }catch(err){
+    setStatus('modalStatusProposta', 'Falha no processamento: '+err.message, false);
+    btn.disabled = false;
+  }
+  btn.textContent = 'Processar Proposta';
+});
+
+/* ======================================================
+   MODAL "Cadastrar base" (Configurações → Frete Definitivo)
+   Reaproveita parseArquivoFrete / parseArquivoTorre / montarItensFrete /
+   chamarEdgeFunctionProcessarFrete — mesma lógica do quadrante Frete
+   Definitivo em Upload, com estado próprio.
+====================================================== */
+let modalStateArquivoFrete = [];
+let modalStateArquivoTorre = [];
+function abrirModalBaseDefinitivo(){
+  document.getElementById('modalBaseDefinitivo').style.display = 'flex';
+  document.getElementById('modalFileFrete').value = '';
+  document.getElementById('modalFileTorre').value = '';
+  ['modalDzFrete','modalDzTorre'].forEach(id=>document.getElementById(id).classList.remove('filled'));
+  document.getElementById('modalFileNameFrete').textContent = '';
+  document.getElementById('modalFileNameTorre').textContent = '';
+  document.getElementById('modalStatusBaseDefinitivo').style.display = 'none';
+  modalStateArquivoFrete = []; modalStateArquivoTorre = [];
+  checkReadyModalBaseDefinitivo();
+}
+function fecharModalBaseDefinitivo(){ document.getElementById('modalBaseDefinitivo').style.display = 'none'; }
+document.getElementById('btnCadastrarBaseDefinitivo').addEventListener('click', abrirModalBaseDefinitivo);
+document.getElementById('btnFecharModalBaseDefinitivo').addEventListener('click', fecharModalBaseDefinitivo);
+document.getElementById('modalBtnCancelarBaseDefinitivo').addEventListener('click', fecharModalBaseDefinitivo);
+document.getElementById('modalBaseDefinitivo').addEventListener('click', e=>{ if(e.target.id==='modalBaseDefinitivo') fecharModalBaseDefinitivo(); });
+
+function checkReadyModalBaseDefinitivo(){
+  document.getElementById('modalBtnProcessarBaseDefinitivo').disabled = !(modalStateArquivoFrete.length && modalStateArquivoTorre.length);
+}
+setupDropzone('modalFileFrete','modalDzFrete','modalFileNameFrete','modalStatusBaseDefinitivo', parseArquivoFrete, d=>{
+  modalStateArquivoFrete = d; checkReadyModalBaseDefinitivo();
+});
+setupDropzone('modalFileTorre','modalDzTorre','modalFileNameTorre','modalStatusBaseDefinitivo', parseArquivoTorre, d=>{
+  modalStateArquivoTorre = d; checkReadyModalBaseDefinitivo();
+});
+
+document.getElementById('modalBtnProcessarBaseDefinitivo').addEventListener('click', async ()=>{
+  const btn = document.getElementById('modalBtnProcessarBaseDefinitivo');
+  btn.disabled = true; btn.textContent = 'Processando…';
+  await new Promise(r=>setTimeout(r,20));
+  try{
+    const t0 = performance.now();
+    const itens = montarItensFrete(modalStateArquivoFrete, modalStateArquivoTorre);
+    const ms = Math.round(performance.now()-t0);
+    setStatus('modalStatusBaseDefinitivo', 'Enviando '+itens.length+' itens…', null);
+    document.getElementById('modalStatusBaseDefinitivo').style.display = 'flex';
+    const res = await chamarEdgeFunctionProcessarFrete(itens, 'definitivo', 'modalStatusBaseDefinitivo');
+    // mantém stateDefinitivo em dia, pra Simulação e KPIs em modo demo continuarem consistentes
+    stateDefinitivo = itens;
+    setStatus('modalStatusBaseDefinitivo', (res.count ?? itens.length)+' linhas gravadas em frete_definitivo ('+ms+'ms de processamento local).', true);
+    if(!DEMO_MODE) carregarVisaoGeralDoBanco();
+    crudRecarregar('definitivo');
+    setTimeout(fecharModalBaseDefinitivo, 1200);
+  }catch(err){
+    setStatus('modalStatusBaseDefinitivo', 'Falha ao processar Frete Definitivo: '+err.message, false);
+    btn.disabled = false;
+  }
+  btn.textContent = 'Processar Frete Definitivo';
+});
+
+/* ======================================================
+   VISÃO GERAL
+====================================================== */
+let totalDefinitivoBanco = 0;
+function renderOverview(){
+  const totalProp = prospeccoesCadastradas.length;
+  const totalCruzadas = prospeccoesCadastradas.reduce((a,p)=>a+p.cruzadas,0);
+  const totalItensDefinitivo = DEMO_MODE ? (stateDefinitivo.length || demoFreteDefinitivo.length) : totalDefinitivoBanco;
+  const kpis = [
+    {label:'Prospecções cadastradas', value: totalProp},
+    {label:'CTes cruzados', value: totalCruzadas},
+    {label:'Itens em Frete Definitivo', value: totalItensDefinitivo || '—'}
+  ];
+  document.getElementById('kpiOverview').innerHTML = kpis.map(k=>`
+    <div class="kpi-card"><div class="label">${k.label}</div><div class="value">${k.value}</div></div>`).join('');
+
+  const tbody = document.querySelector('#tblProspeccoes tbody');
+  if(!prospeccoesCadastradas.length){
+    tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;color:var(--text-dim);padding:24px;">Nenhuma prospecção processada ainda. Clique em "Adicionar Proposta".</td></tr>';
+    return;
+  }
+  tbody.innerHTML = prospeccoesCadastradas.map(p=>
+    `<tr style="cursor:pointer" data-nomeproposta="${p.nomeProposta}"><td>${p.nomeProposta}</td><td>${p.transportadora}</td><td class="mono">${p.cruzadas}</td></tr>`
+  ).join('');
+  tbody.querySelectorAll('tr[data-nomeproposta]').forEach(tr=>{
+    tr.addEventListener('click', ()=>{
+      gotoJanela('comparativo');
+      const sel = document.getElementById('fProspeccao');
+      sel.value = tr.dataset.nomeproposta;
+      renderDashboard();
+    });
+  });
+}
+renderOverview();
+
+// Carrega Visão Geral direto do banco (a versão anterior só refletia o que
+// tinha sido processado NESTA sessão do navegador — por isso parecia
+// "vazio" mesmo com dados reais já gravados no Supabase).
+async function carregarVisaoGeralDoBanco(){
+  if(DEMO_MODE){ renderOverview(); return; }
+  try{
+    const { count } = await sb.from('frete_definitivo').select('id', {count:'exact', head:true});
+    totalDefinitivoBanco = count || 0;
+
+    const { data: viewRows, error } = await sb.from('vw_analise_comparativa_regiao_uf')
+      .select('nome_proposta, nome_transportadora, total_ctes_enviados');
+    if(error) throw error;
+    const porProposta = new Map();
+    (viewRows||[]).forEach(r=>{
+      if(!porProposta.has(r.nome_proposta)){
+        porProposta.set(r.nome_proposta, {nomeProposta:r.nome_proposta, transportadora:r.nome_transportadora, cruzadas:0});
+      }
+      porProposta.get(r.nome_proposta).cruzadas += r.total_ctes_enviados||0;
+    });
+    prospeccoesCadastradas = [...porProposta.values()];
+  }catch(err){
+    console.error('Erro ao carregar Visão Geral do banco:', err);
+  }
+  renderOverview();
+  populateProspeccaoFilters();
+}
+if(!DEMO_MODE) carregarVisaoGeralDoBanco();
+
+/* ======================================================
+   SIMULAÇÃO — exportar modelo para transportadora
+   Puxa do Frete Definitivo já gravado no banco (real ou demo),
+   filtrável por empresa (Matriz / Viana / Ambas).
+====================================================== */
+async function buscarFreteDefinitivoParaExport(empresaFiltro){
+  if(DEMO_MODE){
+    return empresaFiltro ? demoFreteDefinitivo.filter(r=>r.empresa===empresaFiltro) : demoFreteDefinitivo;
+  }
+  // Pagina em blocos de 1000 — é o teto padrão do PostgREST por consulta,
+  // então sem paginação a exportação vinha cortada em tabelas grandes.
+  const PAGINA = 1000;
+  let todas = [], desde = 0;
+  while(true){
+    let query = sb.from('frete_definitivo')
+      .select('data,empresa,nr_cte,nr_nota,valor_nota,peso,m3,peso_cubado,cidade,uf,regiao')
+      .range(desde, desde+PAGINA-1);
+    if(empresaFiltro) query = query.eq('empresa', empresaFiltro);
+    const { data, error } = await query;
+    if(error){ console.error('Erro ao buscar frete_definitivo:', error); throw error; }
+    todas = todas.concat(data||[]);
+    if(!data || data.length < PAGINA) break;
+    desde += PAGINA;
+  }
+  return todas;
+}
+async function atualizarContagemSimulacao(){
+  const el = document.getElementById('simulContagem');
+  if(!el) return;
+  el.textContent = 'Carregando…';
+  try{
+    const empresaFiltro = document.getElementById('selSimulEmpresa').value;
+    if(DEMO_MODE){
+      const total = empresaFiltro ? demoFreteDefinitivo.filter(r=>r.empresa===empresaFiltro).length : demoFreteDefinitivo.length;
+      el.textContent = total+' registro(s) disponível(is) em frete_definitivo.';
+    }else{
+      let query = sb.from('frete_definitivo').select('id', {count:'exact', head:true});
+      if(empresaFiltro) query = query.eq('empresa', empresaFiltro);
+      const { count, error } = await query;
+      if(error) throw error;
+      el.textContent = (count||0)+' registro(s) disponível(is) em frete_definitivo'+(empresaFiltro?' ('+empresaFiltro+')':'')+'.';
+    }
+  }catch(err){
+    el.textContent = 'Erro ao consultar: '+err.message;
+  }
+}
+document.getElementById('selSimulEmpresa').addEventListener('change', atualizarContagemSimulacao);
+
+document.getElementById('btnExportarModelo').addEventListener('click', async ()=>{
+  const btn = document.getElementById('btnExportarModelo');
+  const empresaFiltro = document.getElementById('selSimulEmpresa').value;
+  btn.disabled = true; btn.textContent = 'Buscando dados…';
+  try{
+    const base = await buscarFreteDefinitivoParaExport(empresaFiltro);
+    if(!base.length){
+      setStatus('simulStatus','Nenhum registro encontrado em frete_definitivo'+(empresaFiltro?' para '+empresaFiltro:'')+'. Processe o Frete Definitivo em Upload primeiro.', false);
+      document.getElementById('simulStatus').style.display='flex';
+      return;
+    }
+    const rows = base.map(r=>({
+      'data': r.data, 'empresa': r.empresa, 'nr cte': r.nr_cte, 'nr nota': r.nr_nota, 'valor nota': r.valor_nota,
+      'peso': r.peso, 'M3': r.m3, 'peso cubado': r.peso_cubado, 'cidade': r.cidade,
+      'uf': r.uf, 'região': r.regiao,
+      'prazo entrega': '', 'valor cte': '',
+      'frete peso': '', 'gris': '', 'advalorem': '', 'pedagio': '', 'tas': '', 'emex': '',
+      'trt': '', 'suframa': '', 'seguro fluvial': '', 'redespacho fluvial': '', 'taxa despacho': '', 'generalidades': ''
+    }));
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Arquivo de Prospecção');
+    const sufixo = empresaFiltro ? '_'+empresaFiltro.toLowerCase() : '';
+    XLSX.writeFile(wb, 'arquivo_prospeccao'+sufixo+'.xlsx');
+    setStatus('simulStatus', rows.length+' linhas exportadas.', true);
+  }catch(err){
+    setStatus('simulStatus', 'Falha ao exportar: '+err.message, false);
+  }
+  document.getElementById('simulStatus').style.display='flex';
+  btn.disabled = false; btn.textContent = 'Exportar modelo (.xlsx)';
+});
+
+/* ======================================================
+   DASHBOARD COMPARATIVO — consome vw_analise_comparativa_regiao_uf,
+   que já vem AGREGADA por (nome_proposta, regiao, uf). Não existe
+   filtro de faixa de peso: a view real não agrupa por essa dimensão.
+====================================================== */
+const REGIOES_UF = ['Norte','Nordeste','Centro-Oeste','Sudeste','Sul'];
+
+function populateProspeccaoFilters(){
+  const sel = document.getElementById('fProspeccao');
+  const vistos = new Set();
+  const opcoes = prospeccoesCadastradas.filter(p=>{
+    if(vistos.has(p.nomeProposta)) return false;
+    vistos.add(p.nomeProposta); return true;
+  });
+  const atual = sel.value;
+  sel.innerHTML = opcoes.map(p=>`<option value="${p.nomeProposta}">${p.nomeProposta} — ${p.transportadora}</option>`).join('')
+    || '<option value="">Nenhuma prospecção disponível</option>';
+  if(atual && opcoes.some(p=>p.nomeProposta===atual)) sel.value = atual;
+}
+
+/* --- Mescla linhas agregadas que compartilham uma chave (ex: somar
+   Matriz+Viana de um mesmo UF quando "Ambas" está selecionado, ou
+   agrupar UFs de uma região pra tabela Geral). Soma os totais e faz
+   média ponderada pelo volume de CTes nas métricas de taxa/prazo. --- */
+const CAMPOS_SOMA = [
+  'valor_total_notas','total_frete_definitivo','total_frete_prospeccao',
+  'total_frete_peso_definitivo','total_frete_peso_prospeccao',
+  'total_gris_definitivo','total_gris_prospeccao',
+  'total_advalorem_definitivo','total_advalorem_prospeccao',
+  'total_pedagio_definitivo','total_pedagio_prospeccao',
+  'total_tas_definitivo','total_tas_prospeccao',
+  'total_emex_definitivo','total_emex_prospeccao',
+  'total_trt_definitivo','total_trt_prospeccao',
+  'total_suframa_definitivo','total_suframa_prospeccao',
+  'total_seguro_fluvial_definitivo','total_seguro_fluvial_prospeccao',
+  'total_redespacho_fluvial_definitivo','total_redespacho_fluvial_prospeccao',
+  'total_taxa_despacho_definitivo','total_taxa_despacho_prospeccao',
+  'total_generalidades_definitivo','total_generalidades_prospeccao'
+];
+const CAMPOS_MEDIA_PONDERADA = [
+  'custo_medio_cte_definitivo','custo_medio_cte_prospeccao',
+  'pct_medio_frete_definitivo','pct_medio_frete_prospeccao',
+  'custo_medio_kg_definitivo','custo_medio_kg_prospeccao',
+  'prazo_medio_definitivo_dias','prazo_medio_prospeccao_dias'
+];
+// Campos que são listas (string separada por vírgula) — mesclar significa
+// juntar os valores distintos de todas as linhas, não somar nem tirar média.
+const CAMPOS_LISTA = ['transportadoras_definitivo'];
+function mesclarListaCsv(valores){
+  const distintos = new Set();
+  valores.forEach(v=> String(v||'').split(',').map(s=>s.trim()).filter(Boolean).forEach(s=>distintos.add(s)));
+  return [...distintos].sort().join(', ');
+}
+function mesclarPorChave(rows, chaveDe, camposExtras){
+  const grupos = new Map();
+  rows.forEach(r=>{
+    const key = chaveDe(r);
+    if(!grupos.has(key)) grupos.set(key, []);
+    grupos.get(key).push(r);
+  });
+  return [...grupos.values()].map(linhas=>{
+    const ctesTotais = linhas.reduce((a,r)=>a+(r.total_ctes_enviados||0),0);
+    const out = { total_ctes_enviados: ctesTotais };
+    CAMPOS_SOMA.forEach(c=> out[c] = linhas.reduce((a,r)=>a+(r[c]||0),0));
+    CAMPOS_MEDIA_PONDERADA.forEach(c=> out[c] = ctesTotais ? linhas.reduce((a,r)=>a+(r[c]||0)*(r.total_ctes_enviados||0),0)/ctesTotais : 0);
+    CAMPOS_LISTA.forEach(c=> out[c] = mesclarListaCsv(linhas.map(r=>r[c])));
+    if(camposExtras) camposExtras.forEach(c=> out[c] = linhas[0][c]);
+    return out;
+  });
+}
+const CAMPOS_LINHA_DEF = ['valor_nota','valor_cte','perc_frete','custo_kg','prazo_entrega',
+  'frete_peso','gris','advalorem','pedagio','tas','emex','trt','suframa','seguro_fluvial','redespacho_fluvial','taxa_despacho','generalidades'];
+
+// Reproduz a agregação da view real (GROUP BY nome_proposta, empresa,
+// regiao, uf, com INNER JOIN em nr_nota) usando os espelhos locais de DEMO_MODE.
+function agregarLinhasDemo(nomeProposta, chaveDe, camposExtras){
+  const defByNota = new Map(demoFreteDefinitivo.map(r=>[r.nr_nota,r]));
+  const grupos = new Map();
+  demoFreteProspeccao.filter(p=>p.nome_proposta===nomeProposta).forEach(p=>{
+    const d = defByNota.get(p.nr_nota);
+    if(!d) return; // INNER JOIN: só entra quando casa com o definitivo
+    const key = chaveDe(d);
+    if(!grupos.has(key)) grupos.set(key, {chaveObj:d, linhasDef:[], linhasProp:[], ctes:new Set()});
+    const g = grupos.get(key);
+    g.ctes.add(d.nr_cte); g.linhasDef.push(d); g.linhasProp.push(p);
+  });
+  const somaCampo = (arr,c) => arr.reduce((a,r)=>a+(r[c]||0),0);
+  const avg = (arr,c) => arr.length ? somaCampo(arr,c)/arr.length : 0;
+  return [...grupos.values()].map(g=>{
+    const out = {
+      nome_proposta: nomeProposta, total_ctes_enviados: g.ctes.size,
+      valor_total_notas: somaCampo(g.linhasDef,'valor_nota'),
+      total_frete_definitivo: somaCampo(g.linhasDef,'valor_cte'),
+      total_frete_prospeccao: somaCampo(g.linhasProp,'valor_cte'),
+      custo_medio_cte_definitivo: avg(g.linhasDef,'valor_cte'), custo_medio_cte_prospeccao: avg(g.linhasProp,'valor_cte'),
+      pct_medio_frete_definitivo: avg(g.linhasDef,'perc_frete'), pct_medio_frete_prospeccao: avg(g.linhasProp,'perc_frete'),
+      custo_medio_kg_definitivo: avg(g.linhasDef,'custo_kg'), custo_medio_kg_prospeccao: avg(g.linhasProp,'custo_kg'),
+      prazo_medio_definitivo_dias: avg(g.linhasDef,'prazo_entrega'), prazo_medio_prospeccao_dias: avg(g.linhasProp,'prazo_entrega'),
+      transportadoras_definitivo: mesclarListaCsv(g.linhasDef.map(r=>r.transportadora))
+    };
+    ['frete_peso','gris','advalorem','pedagio','tas','emex','trt','suframa','seguro_fluvial','redespacho_fluvial','taxa_despacho','generalidades'].forEach(c=>{
+      out['total_'+c+'_definitivo'] = somaCampo(g.linhasDef,c);
+      out['total_'+c+'_prospeccao'] = somaCampo(g.linhasProp,c);
+    });
+    if(camposExtras) camposExtras.forEach(c=> out[c] = g.chaveObj[c]);
+    return out;
+  });
+}
+function agregarDemo(nomeProposta){
+  return agregarLinhasDemo(nomeProposta, d=>(d.empresa||'')+'|'+d.regiao+'|'+d.uf, ['empresa','regiao','uf']);
+}
+function agregarDemoFaixaPeso(nomeProposta){
+  return agregarLinhasDemo(nomeProposta, d=>(d.empresa||'')+'|'+(d.classificacao||''), ['empresa','classificacao']);
+}
+
+let chartCustoKgInst=null, chartPercFreteInst=null, chartTaxasInst=null, chartPrazoInst=null;
+if(window.ChartDataLabels) Chart.register(ChartDataLabels); // rótulos de dados estáticos nos gráficos
+let ocultarDefinitivo = false; // toggle "Ocultar Frete Definitivo" — declarada antes de qualquer uso
+
+async function fetchViewData(nomeProposta, empresaFiltro){
+  let rows;
+  if(DEMO_MODE){
+    rows = agregarDemo(nomeProposta);
+  }else{
+    const { data, error } = await sb.from('vw_analise_comparativa_regiao_uf').select('*').eq('nome_proposta', nomeProposta);
+    if(error){ console.error('Erro ao carregar métricas:', error); return []; }
+    rows = data||[];
+  }
+  if(empresaFiltro) return rows.filter(r=>r.empresa===empresaFiltro);
+  return mesclarPorChave(rows, r=>r.uf, ['uf','regiao']); // sem filtro: mescla Matriz+Viana por UF
+}
+async function fetchViewDataFaixaPeso(nomeProposta, empresaFiltro){
+  let rows;
+  if(DEMO_MODE){
+    rows = agregarDemoFaixaPeso(nomeProposta);
+  }else{
+    const { data, error } = await sb.from('vw_analise_comparativa_faixa_peso').select('*').eq('nome_proposta', nomeProposta);
+    if(error){ console.error('Erro ao carregar faixas de peso:', error); return []; }
+    rows = data||[];
+  }
+  if(empresaFiltro) return rows.filter(r=>r.empresa===empresaFiltro);
+  return mesclarPorChave(rows, r=>r.classificacao, ['classificacao']);
+}
+
+document.getElementById('fProspeccao').addEventListener('change', renderDashboard);
+document.getElementById('fEmpresa').addEventListener('change', renderDashboard);
+document.getElementById('btnOcultarDefinitivo').addEventListener('click', ()=>{
+  ocultarDefinitivo = !ocultarDefinitivo;
+  document.getElementById('btnOcultarDefinitivo').textContent = ocultarDefinitivo ? 'Mostrar Frete Definitivo' : 'Ocultar Frete Definitivo';
+  renderDashboard();
+});
+document.getElementById('btnImprimirComparativo').addEventListener('click', ()=> window.print());
+
+async function renderDashboard(){
+  if(!prospeccoesCadastradas.length){
+    document.getElementById('kpiDashboard').innerHTML='';
+    document.getElementById('routeList').innerHTML = `<div class="empty-state"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 19V9M11 19V4M18 19v-7"/></svg><p>Nenhuma prospecção cadastrada ainda. Clique em "Adicionar Proposta" na Visão Geral.</p></div>`;
+    document.getElementById('faixaList').innerHTML = '';
+    document.getElementById('tblGeralBody').innerHTML = '';
+    [chartCustoKgInst,chartPercFreteInst,chartTaxasInst,chartPrazoInst].forEach(c=>c&&c.destroy());
+    return;
+  }
+  const nomeProposta = document.getElementById('fProspeccao').value || prospeccoesCadastradas[0].nomeProposta;
+  const empresaFiltro = document.getElementById('fEmpresa').value;
+
+  const rows = await fetchViewData(nomeProposta, empresaFiltro);
+  const faixaRows = await fetchViewDataFaixaPeso(nomeProposta, empresaFiltro);
+
+  // KPIs
+  const totalCtes = rows.reduce((a,r)=>a+(r.total_ctes_enviados||0),0);
+  const valorTotalNotas = rows.reduce((a,r)=>a+(r.valor_total_notas||0),0);
+  const valorTotalDef = rows.reduce((a,r)=>a+(r.total_frete_definitivo||0),0);
+  const valorTotalProp = rows.reduce((a,r)=>a+(r.total_frete_prospeccao||0),0);
+  const variacao = valorTotalDef ? ((valorTotalProp-valorTotalDef)/valorTotalDef*100) : 0;
+  const fmtR$ = v => 'R$ '+v.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const kpisTodos = [
+    {label:'Volume total (CTes)', value: totalCtes},
+    {label:'Valor total de Notas', value: fmtR$(valorTotalNotas)},
+    {label:'Valor total de CTe — parceiras', value: fmtR$(valorTotalDef), definitivo:true},
+    {label:'Valor total de CTe — proposta', value: fmtR$(valorTotalProp)},
+    {label:'Variação de frete', value:(variacao>0?'+':'')+variacao.toFixed(1)+'%', deltaClass: variacao<=0?'down':'up', definitivo:true}
+  ];
+  document.getElementById('kpiDashboard').innerHTML = kpisTodos
+    .filter(k=> !ocultarDefinitivo || !k.definitivo)
+    .map(k=>`<div class="kpi-card"><div class="label">${k.label}</div><div class="value">${k.value}</div>${k.deltaClass?`<div class="delta ${k.deltaClass}">${variacao<=0?'economia':'aumento'} vs. definitivo</div>`:''}</div>`).join('');
+
+  const porUf = [...rows].sort((a,b)=>a.uf.localeCompare(b.uf));
+  const ufs = porUf.map(r=>r.uf);
+  const totalCtesPond = totalCtes || 1;
+
+  // Datasets "Definitivo" somem quando o toggle está ativo — reaproveitado nos 4 gráficos.
+  const datasetsDefProp = (dadosDef, dadosProp, cor) => ocultarDefinitivo
+    ? [{label:'Proposta', data: dadosProp, backgroundColor:cor, borderColor:cor, borderRadius:4, maxBarThickness:20, tension:.3}]
+    : [{label:'Definitivo', data: dadosDef, backgroundColor:'#B9BED4', borderColor:'#B9BED4', borderRadius:4, maxBarThickness:20, tension:.3},
+       {label:'Proposta', data: dadosProp, backgroundColor:cor, borderColor:cor, borderRadius:4, maxBarThickness:20, tension:.3}];
+  const datalabelsMoeda = { color:'#3a3f5c', font:{size:9,weight:600}, anchor:'end', align:'top',
+    formatter: v => 'R$ '+(v||0).toFixed(0) };
+  const datalabelsPct = { color:'#3a3f5c', font:{size:9,weight:600}, align:'top',
+    formatter: v => (v||0).toFixed(1)+'%' };
+  const datalabelsDias = { color:'#3a3f5c', font:{size:9,weight:600}, anchor:'end', align:'top',
+    formatter: v => (v||0).toFixed(0)+'d' };
+
+  // Gráfico 1: Comparativo Custo/kg (rosca)
+  const custoDefMed = rows.reduce((a,r)=>a+(r.custo_medio_kg_definitivo||0)*(r.total_ctes_enviados||0),0)/totalCtesPond;
+  const custoPropMed = rows.reduce((a,r)=>a+(r.custo_medio_kg_prospeccao||0)*(r.total_ctes_enviados||0),0)/totalCtesPond;
+  const labelsRosca = ocultarDefinitivo ? ['Proposta'] : ['Definitivo','Proposta'];
+  const dadosRosca = ocultarDefinitivo ? [custoPropMed] : [custoDefMed,custoPropMed];
+  const coresRosca = ocultarDefinitivo ? ['#5347EE'] : ['#B9BED4','#5347EE'];
+  if(chartCustoKgInst) chartCustoKgInst.destroy();
+  chartCustoKgInst = new Chart(document.getElementById('chartCustoKgRosca'), {
+    type:'doughnut',
+    data:{ labels:labelsRosca, datasets:[{data:dadosRosca, backgroundColor:coresRosca, borderWidth:0}]},
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom', labels:{boxWidth:9,font:{size:11}}},
+      tooltip:{callbacks:{label:ctx=>ctx.label+': R$ '+ctx.parsed.toFixed(3)}},
+      datalabels:{ color:'#fff', font:{size:11,weight:700}, formatter: v=>'R$ '+(v||0).toFixed(2) }} }
+  });
+
+  // Gráfico 2: Percentual de Frete (linha, por UF)
+  if(chartPercFreteInst) chartPercFreteInst.destroy();
+  chartPercFreteInst = new Chart(document.getElementById('chartPercFreteLinha'), {
+    type:'line',
+    data:{ labels: ufs, datasets: datasetsDefProp(
+      porUf.map(r=>r.pct_medio_frete_definitivo||0), porUf.map(r=>r.pct_medio_frete_prospeccao||0), '#5347EE') },
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom',labels:{boxWidth:9,font:{size:11}}},
+      datalabels:datalabelsPct}, scales:{y:{ticks:{callback:v=>v.toFixed(1)+'%'}}} }
+  });
+
+  // Gráfico 3: Composição de taxas (barras verticais, 2 por taxa — rolagem horizontal via wrapper no HTML)
+  const TAXAS_LABELS = [
+    ['frete_peso','Frete Peso'],['gris','GRIS'],['advalorem','Advalorem'],['pedagio','Pedágio'],
+    ['tas','TAS'],['emex','EMEX'],['trt','TRT'],['suframa','Suframa'],
+    ['seguro_fluvial','Seguro Fluvial'],['redespacho_fluvial','Redespacho Fluv.'],
+    ['taxa_despacho','Taxa Despacho'],['generalidades','Generalidades']
+  ];
+  const taxasDef = TAXAS_LABELS.map(([campo])=> rows.reduce((a,r)=>a+(r['total_'+campo+'_definitivo']||0),0));
+  const taxasProp = TAXAS_LABELS.map(([campo])=> rows.reduce((a,r)=>a+(r['total_'+campo+'_prospeccao']||0),0));
+  if(chartTaxasInst) chartTaxasInst.destroy();
+  chartTaxasInst = new Chart(document.getElementById('chartTaxasComparativo'), {
+    type:'bar',
+    data:{ labels: TAXAS_LABELS.map(t=>t[1]), datasets: datasetsDefProp(taxasDef, taxasProp, '#5347EE') },
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom',labels:{boxWidth:9,font:{size:11}}},
+      datalabels:datalabelsMoeda}, scales:{y:{ticks:{callback:v=>'R$ '+v.toFixed(0)}}} }
+  });
+
+  // Gráfico 4: Prazo de entrega (barras verticais, por UF — rolagem horizontal via wrapper no HTML)
+  if(chartPrazoInst) chartPrazoInst.destroy();
+  chartPrazoInst = new Chart(document.getElementById('chartPrazoUf'), {
+    type:'bar',
+    data:{ labels: ufs, datasets: datasetsDefProp(
+      porUf.map(r=>r.prazo_medio_definitivo_dias||0), porUf.map(r=>r.prazo_medio_prospeccao_dias||0), '#5347EE') },
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom',labels:{boxWidth:9,font:{size:11}}},
+      datalabels:datalabelsDias}, scales:{y:{ticks:{callback:v=>v.toFixed(0)+'d'}}} }
+  });
+
+  // Legendas — some o chip "Definitivo" quando ocultado
+  document.querySelectorAll('#legendaRotas .legend-chip, #legendaFaixas .legend-chip').forEach((chip,i)=>{
+    if(i%2===0) chip.style.display = ocultarDefinitivo ? 'none' : 'inline-flex';
+  });
+
+  // Rotas comparadas — 3 métricas por lado, por UF (lado Definitivo some com o toggle)
+  const linhaComparativa = (r, rotulo) => {
+    const dCusto = r.custo_medio_kg_definitivo||0, pCusto = r.custo_medio_kg_prospeccao||0;
+    const delta = dCusto ? ((pCusto-dCusto)/dCusto*100) : 0;
+    const blocoProposta = `<div class="route-side pros"><div class="rota-metricas">
+        <div class="item"><span class="k">Vlr Notas</span><span class="v">R$ ${(r.valor_total_notas||0).toFixed(0)}</span></div>
+        <div class="item"><span class="k">Vlr CTe</span><span class="v">R$ ${(r.total_frete_prospeccao||0).toFixed(0)}</span></div>
+        <div class="item"><span class="k">% Frete</span><span class="v">${(r.pct_medio_frete_prospeccao||0).toFixed(1)}%</span></div>
+      </div></div>`;
+    if(ocultarDefinitivo){
+      return `<div class="route-row" style="grid-template-columns:60px 1fr;">
+        <div class="uf-tag" style="font-size:13px;">${rotulo}</div>
+        ${blocoProposta}
+      </div>`;
+    }
+    return `<div class="route-row">
+      <div class="uf-tag" style="font-size:13px;">${rotulo}</div>
+      <div class="route-side def"><div class="rota-metricas">
+        <div class="item"><span class="k">Vlr Notas</span><span class="v">R$ ${(r.valor_total_notas||0).toFixed(0)}</span></div>
+        <div class="item"><span class="k">Vlr CTe</span><span class="v">R$ ${(r.total_frete_definitivo||0).toFixed(0)}</span></div>
+        <div class="item"><span class="k">% Frete</span><span class="v">${(r.pct_medio_frete_definitivo||0).toFixed(1)}%</span></div>
+      </div></div>
+      <div class="route-mid"><div class="route-line"></div><span class="route-arrow">▼</span></div>
+      ${blocoProposta}
+      <div style="grid-column:1/-1;text-align:right;padding-top:8px;margin-top:6px;border-top:1px solid var(--panel-2);"><span class="var-badge ${delta<=0?'down':'up'}">${delta>0?'+':''}${delta.toFixed(1)}% custo/kg</span></div>
+    </div>`;
+  };
+  document.getElementById('routeList').innerHTML = porUf.length
+    ? porUf.map(r=>linhaComparativa(r, r.uf)).join('')
+    : `<div class="empty-state"><p>Nenhum dado para os filtros selecionados.</p></div>`;
+
+  // Faixa de peso — mesma estrutura, por classificação
+  const porFaixa = [...faixaRows].sort((a,b)=>(a.classificacao||'').localeCompare(b.classificacao||''));
+  document.getElementById('faixaList').innerHTML = porFaixa.length
+    ? porFaixa.map(r=>linhaComparativa(r, r.classificacao||'—')).join('')
+    : `<div class="empty-state"><p>Nenhum dado para os filtros selecionados.</p></div>`;
+
+  renderTabelaGeral(rows);
+}
+
+function renderTabelaGeral(rowsUf){
+  const porRegiao = mesclarPorChave(rowsUf, r=>r.regiao, ['regiao']);
+  const ordenado = REGIOES_UF.map(nome=>porRegiao.find(r=>r.regiao===nome)).filter(Boolean)
+    .concat(porRegiao.filter(r=>!REGIOES_UF.includes(r.regiao)));
+  const tbody = document.getElementById('tblGeralBody');
+  if(!ordenado.length){
+    tbody.innerHTML = `<tr><td colspan="${ocultarDefinitivo?5:9}" style="text-align:center;color:var(--text-dim);padding:20px;">Nenhum dado para os filtros selecionados.</td></tr>`;
+    return;
+  }
+  const celulasMetricas = r => `
+    <td class="mono">R$ ${(r.valor_total_notas||0).toFixed(2)}</td>
+    <td class="mono">R$ ${(r.total_frete_prospeccao||0).toFixed(2)}</td>
+    <td class="mono">${(r.pct_medio_frete_prospeccao||0).toFixed(1)}%</td>
+    <td class="mono">${(r.prazo_medio_prospeccao_dias||0).toFixed(1)}d</td>
+    <td class="mono col-definitivo">R$ ${(r.total_frete_definitivo||0).toFixed(2)}</td>
+    <td class="mono col-definitivo">${(r.pct_medio_frete_definitivo||0).toFixed(1)}%</td>
+    <td class="mono col-definitivo">${(r.prazo_medio_definitivo_dias||0).toFixed(1)}d</td>
+    <td class="col-definitivo">${r.transportadoras_definitivo || '—'}</td>`;
+  tbody.innerHTML = ordenado.map(r=>{
+    const ufsDaRegiao = rowsUf.filter(u=>u.regiao===r.regiao).sort((a,b)=>a.uf.localeCompare(b.uf));
+    const linhaRegiao = `<tr><td class="regiao-toggle" data-toggle-regiao="${r.regiao}">▸ ${r.regiao}</td>${celulasMetricas(r)}</tr>`;
+    const linhasUf = ufsDaRegiao.map(u=>`<tr class="linha-uf" data-regiao-pai="${r.regiao}" style="display:none;"><td>${u.uf}</td>${celulasMetricas(u)}</tr>`).join('');
+    return linhaRegiao + linhasUf;
+  }).join('');
+  tbody.querySelectorAll('[data-toggle-regiao]').forEach(td=>{
+    td.addEventListener('click', ()=>{
+      const nome = td.dataset.toggleRegiao;
+      const linhas = tbody.querySelectorAll(`tr[data-regiao-pai="${nome}"]`);
+      const abrindo = linhas.length && linhas[0].style.display === 'none';
+      linhas.forEach(tr=> tr.style.display = abrindo ? 'table-row' : 'none');
+      td.textContent = (abrindo?'▾ ':'▸ ')+nome;
+    });
+  });
+  document.querySelectorAll('#tblGeral .col-definitivo').forEach(el=> el.style.display = ocultarDefinitivo ? 'none' : '');
+}
+
+
+/* ======================================================
+   CONFIGURAÇÕES — sub-navegação
+====================================================== */
+document.querySelectorAll('.configtab').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    const tab = btn.dataset.configtab;
+    document.querySelectorAll('.configtab').forEach(b=>{
+      b.classList.toggle('btn-primary', b===btn);
+      b.classList.toggle('btn-outline', b!==btn);
+    });
+    document.querySelectorAll('.configsub').forEach(s=> s.style.display = (s.id==='configsub-'+tab) ? 'block' : 'none');
+    if(tab==='faixas') renderFaixas();
+    if(tab==='definitivo') crudRecarregar('definitivo');
+    if(tab==='prospeccao') crudRecarregar('prospeccao');
+  });
+});
+
+/* ======================================================
+   FAIXAS DE PESO — CRUD simples (poucas linhas, tudo em tela)
+====================================================== */
+async function carregarFaixas(){
+  if(DEMO_MODE) return [...demoFaixasPeso].sort((a,b)=>a.ordem-b.ordem);
+  const { data, error } = await sb.from('config_faixas_peso').select('*').order('ordem');
+  if(error){ console.error(error); return []; }
+  return data;
+}
+async function renderFaixas(){
+  const faixas = await carregarFaixas();
+  const tbody = document.querySelector('#tblFaixas tbody');
+  tbody.innerHTML = faixas.map(f=>`
+    <tr data-id="${f.id}">
+      <td><input class="field-input" style="width:100px" type="number" value="${f.peso_min}" data-campo="peso_min"></td>
+      <td><input class="field-input" style="width:100px" type="number" value="${f.peso_max??''}" placeholder="sem limite" data-campo="peso_max"></td>
+      <td><input class="field-input" style="width:140px" value="${f.classificacao}" data-campo="classificacao"></td>
+      <td><input class="field-input" style="width:70px" type="number" value="${f.ordem}" data-campo="ordem"></td>
+      <td>
+        <button class="btn btn-outline" style="padding:5px 10px;font-size:11px;" onclick="salvarFaixa('${f.id}')">Salvar</button>
+        <button class="btn btn-outline" style="padding:5px 10px;font-size:11px;color:var(--danger);" onclick="excluirFaixa('${f.id}')">Excluir</button>
+      </td>
+    </tr>`).join('') || '<tr><td colspan="5" style="text-align:center;color:var(--text-dim);padding:20px;">Nenhuma faixa cadastrada.</td></tr>';
+}
+function lerLinhaFaixa(id){
+  const tr = document.querySelector(`#tblFaixas tr[data-id="${id}"]`);
+  const get = campo => tr.querySelector(`[data-campo="${campo}"]`).value;
+  return {
+    peso_min: parseFloat(get('peso_min'))||0,
+    peso_max: get('peso_max')==='' ? null : parseFloat(get('peso_max')),
+    classificacao: get('classificacao').trim(),
+    ordem: parseInt(get('ordem'),10)||0
+  };
+}
+async function salvarFaixa(id){
+  const dados = lerLinhaFaixa(id);
+  if(DEMO_MODE){
+    const idx = demoFaixasPeso.findIndex(f=>f.id===id);
+    if(idx>=0) demoFaixasPeso[idx] = {...demoFaixasPeso[idx], ...dados};
+  }else{
+    const { error } = await sb.from('config_faixas_peso').update(dados).eq('id', id);
+    if(error){ setStatus('statusFaixas','Erro ao salvar: '+error.message, false); document.getElementById('statusFaixas').style.display='flex'; return; }
+  }
+  setStatus('statusFaixas','Faixa salva.', true);
+  document.getElementById('statusFaixas').style.display='flex';
+  renderFaixas();
+}
+async function excluirFaixa(id){
+  if(!confirm('Excluir essa faixa de peso?')) return;
+  if(DEMO_MODE){
+    demoFaixasPeso = demoFaixasPeso.filter(f=>f.id!==id);
+  }else{
+    const { error } = await sb.from('config_faixas_peso').delete().eq('id', id);
+    if(error){ setStatus('statusFaixas','Erro ao excluir: '+error.message, false); document.getElementById('statusFaixas').style.display='flex'; return; }
+  }
+  renderFaixas();
+}
+document.getElementById('btnNovaFaixa').addEventListener('click', async ()=>{
+  const nova = {peso_min:0, peso_max:null, classificacao:'Nova faixa', ordem: (await carregarFaixas()).length+1};
+  if(DEMO_MODE){
+    demoFaixasPeso.push({...nova, id:'f'+Date.now()});
+  }else{
+    const { error } = await sb.from('config_faixas_peso').insert(nova);
+    if(error){ setStatus('statusFaixas','Erro ao criar: '+error.message, false); document.getElementById('statusFaixas').style.display='flex'; return; }
+  }
+  renderFaixas();
+});
+
+/* ======================================================
+   CRUD GENÉRICO — Frete Definitivo / Frete Prospecção
+====================================================== */
+const COLUNAS_FRETE_DEFINITIVO = [
+  {key:'nr_cte', label:'Nr CTe'}, {key:'nr_nota', label:'Nr Nota'}, {key:'data', label:'Data', type:'date'},
+  {key:'empresa', label:'Empresa'}, {key:'transportadora', label:'Transportadora'},
+  {key:'cidade', label:'Cidade'}, {key:'uf', label:'UF'}, {key:'regiao', label:'Região'},
+  {key:'peso', label:'Peso', type:'number'}, {key:'m3', label:'M3', type:'number'},
+  {key:'peso_cubado', label:'Peso Cubado', type:'number'}, {key:'classificacao', label:'Classificação'},
+  {key:'valor_nota', label:'Valor Nota', type:'number'}, {key:'valor_cte', label:'Valor CTe', type:'number'},
+  {key:'perc_frete', label:'% Frete', type:'number'}, {key:'custo_kg', label:'Custo/kg', type:'number'},
+  {key:'frete_peso', label:'Frete Peso', type:'number'}, {key:'gris', label:'GRIS', type:'number'},
+  {key:'advalorem', label:'Advalorem', type:'number'}, {key:'pedagio', label:'Pedágio', type:'number'},
+  {key:'tas', label:'TAS', type:'number'}, {key:'emex', label:'EMEX', type:'number'},
+  {key:'trt', label:'TRT', type:'number'}, {key:'suframa', label:'Suframa', type:'number'},
+  {key:'seguro_fluvial', label:'Seguro Fluvial', type:'number'}, {key:'redespacho_fluvial', label:'Redespacho Fluvial', type:'number'},
+  {key:'taxa_despacho', label:'Taxa Despacho', type:'number'}, {key:'generalidades', label:'Generalidades', type:'number'},
+  {key:'prazo_entrega', label:'Prazo Entrega', type:'number'}
+];
+const COLUNAS_FRETE_PROSPECCAO = [
+  {key:'nome_proposta', label:'Data Proposta'}, {key:'transportadora', label:'Transportadora'},
+  {key:'nr_cte', label:'Nr CTe'}, {key:'nr_nota', label:'Nr Nota'}, {key:'data', label:'Data', type:'date'},
+  {key:'empresa', label:'Empresa'}, {key:'cidade', label:'Cidade'}, {key:'uf', label:'UF'}, {key:'regiao', label:'Região'},
+  {key:'peso', label:'Peso', type:'number'}, {key:'m3', label:'M3', type:'number'},
+  {key:'peso_cubado', label:'Peso Cubado', type:'number'}, {key:'classificacao', label:'Classificação'},
+  {key:'valor_nota', label:'Valor Nota', type:'number'}, {key:'valor_cte', label:'Valor CTe', type:'number'},
+  {key:'perc_frete', label:'% Frete', type:'number'}, {key:'custo_kg', label:'Custo/kg', type:'number'},
+  {key:'frete_peso', label:'Frete Peso', type:'number'}, {key:'gris', label:'GRIS', type:'number'},
+  {key:'advalorem', label:'Advalorem', type:'number'}, {key:'pedagio', label:'Pedágio', type:'number'},
+  {key:'tas', label:'TAS', type:'number'}, {key:'emex', label:'EMEX', type:'number'},
+  {key:'trt', label:'TRT', type:'number'}, {key:'suframa', label:'Suframa', type:'number'},
+  {key:'seguro_fluvial', label:'Seguro Fluvial', type:'number'}, {key:'redespacho_fluvial', label:'Redespacho Fluvial', type:'number'},
+  {key:'taxa_despacho', label:'Taxa Despacho', type:'number'}, {key:'generalidades', label:'Generalidades', type:'number'},
+  {key:'prazo_entrega', label:'Prazo Entrega', type:'number'}
+];
+const TABELAS_CRUD = {
+  definitivo: {
+    tabela: 'frete_definitivo', colunas: COLUNAS_FRETE_DEFINITIVO,
+    resumo: ['nr_cte','nr_nota','data','uf','peso','valor_cte'],
+    getArr: ()=>demoFreteDefinitivo, setArr: a=>{demoFreteDefinitivo=a;}
+  },
+  prospeccao: {
+    tabela: 'frete_prospeccao', colunas: COLUNAS_FRETE_PROSPECCAO,
+    resumo: ['nome_proposta','transportadora','nr_cte','nr_nota','uf','valor_cte'],
+    getArr: ()=>demoFreteProspeccao, setArr: a=>{demoFreteProspeccao=a;}
+  }
+};
+const crudState = {
+  definitivo: {pagina:0, tamanho:25, busca:'', total:0, linhas:[]},
+  prospeccao: {pagina:0, tamanho:25, busca:'', total:0, linhas:[]}
+};
+function cap(s){ return s.charAt(0).toUpperCase()+s.slice(1); }
+function labelDe(colunas, key){ const c = colunas.find(c=>c.key===key); return c ? c.label : key; }
+
+async function crudBuscarPagina(tipo){
+  const cfg = TABELAS_CRUD[tipo]; const st = crudState[tipo];
+  if(DEMO_MODE){
+    let arr = cfg.getArr().map((r,i)=>({...r, _demoIndex:i}));
+    if(st.busca) arr = arr.filter(r => String(r.nr_cte||'').includes(st.busca) || String(r.nr_nota||'').includes(st.busca));
+    st.total = arr.length;
+    st.linhas = arr.slice(st.pagina*st.tamanho, (st.pagina+1)*st.tamanho);
+  }else{
+    let query = sb.from(cfg.tabela).select('*', {count:'exact'});
+    if(st.busca) query = query.or(`nr_cte.ilike.%${st.busca}%,nr_nota.ilike.%${st.busca}%`);
+    query = query.order('id',{ascending:false}).range(st.pagina*st.tamanho, st.pagina*st.tamanho+st.tamanho-1);
+    const { data, count, error } = await query;
+    if(error){ console.error(error); st.linhas=[]; st.total=0; return; }
+    st.linhas = data||[]; st.total = count||0;
+  }
+}
+function crudRenderTabela(tipo){
+  const cfg = TABELAS_CRUD[tipo]; const st = crudState[tipo];
+  const thead = document.querySelector('#tblCrud'+cap(tipo)+' thead');
+  const tbody = document.querySelector('#tblCrud'+cap(tipo)+' tbody');
+  thead.innerHTML = '<tr>'+cfg.resumo.map(c=>'<th>'+labelDe(cfg.colunas,c)+'</th>').join('')+'<th>Ações</th></tr>';
+  tbody.innerHTML = st.linhas.map(r=>{
+    const idVal = DEMO_MODE ? r._demoIndex : r.id;
+    return '<tr>'+cfg.resumo.map(c=>{
+      const v = r[c]; const fmt = typeof v==='number' ? v.toFixed(2) : (v??'');
+      return '<td class="mono">'+fmt+'</td>';
+    }).join('')+
+    `<td><button class="btn btn-outline" style="padding:4px 10px;font-size:11px;" onclick="crudEditar('${tipo}','${idVal}')">Editar</button> `+
+    `<button class="btn btn-outline" style="padding:4px 10px;font-size:11px;color:var(--danger);" onclick="crudExcluir('${tipo}','${idVal}')">Excluir</button></td></tr>`;
+  }).join('') || `<tr><td colspan="${cfg.resumo.length+1}" style="text-align:center;color:var(--text-dim);padding:20px;">Nenhum registro encontrado.</td></tr>`;
+  const totalPaginas = Math.max(1, Math.ceil(st.total/st.tamanho));
+  document.getElementById('paginacaoInfo'+cap(tipo)).textContent = `${st.total} registro(s) — página ${st.pagina+1} de ${totalPaginas}`;
+  document.getElementById('btnPagAnterior'+cap(tipo)).disabled = st.pagina<=0;
+  document.getElementById('btnPagProxima'+cap(tipo)).disabled = (st.pagina+1)>=totalPaginas;
+}
+async function crudRecarregar(tipo){
+  await crudBuscarPagina(tipo);
+  crudRenderTabela(tipo);
+}
+document.getElementById('buscaDefinitivo').addEventListener('input', e=>{ crudState.definitivo.busca=e.target.value.trim(); crudState.definitivo.pagina=0; crudRecarregar('definitivo'); });
+document.getElementById('buscaProspeccao').addEventListener('input', e=>{ crudState.prospeccao.busca=e.target.value.trim(); crudState.prospeccao.pagina=0; crudRecarregar('prospeccao'); });
+document.getElementById('btnPagAnteriorDefinitivo').addEventListener('click', ()=>{ if(crudState.definitivo.pagina>0){ crudState.definitivo.pagina--; crudRecarregar('definitivo'); } });
+document.getElementById('btnPagProximaDefinitivo').addEventListener('click', ()=>{ crudState.definitivo.pagina++; crudRecarregar('definitivo'); });
+document.getElementById('btnPagAnteriorProspeccao').addEventListener('click', ()=>{ if(crudState.prospeccao.pagina>0){ crudState.prospeccao.pagina--; crudRecarregar('prospeccao'); } });
+document.getElementById('btnPagProximaProspeccao').addEventListener('click', ()=>{ crudState.prospeccao.pagina++; crudRecarregar('prospeccao'); });
+
+function crudRenderPainel(tipo, idVal, dadosIniciais){
+  const cfg = TABELAS_CRUD[tipo];
+  const painel = document.getElementById('painelEdicao'+cap(tipo));
+  const criando = idVal===null;
+  painel.style.display = 'block';
+  painel.innerHTML = `
+    <h3>${criando ? 'Novo registro' : 'Editar registro'}</h3>
+    <div class="field-row" style="grid-template-columns:repeat(3,1fr);flex-wrap:wrap;display:grid;gap:14px;">
+      ${cfg.colunas.map(c=>`
+        <div>
+          <label>${c.label}</label>
+          <input class="field-input" style="width:100%" id="campo_${tipo}_${c.key}" type="${c.type||'text'}"
+            value="${dadosIniciais && dadosIniciais[c.key]!=null ? dadosIniciais[c.key] : ''}">
+        </div>`).join('')}
+    </div>
+    <div style="margin-top:16px;display:flex;gap:10px;">
+      <button class="btn btn-primary" id="btnSalvarPainel${cap(tipo)}">${criando?'Criar':'Salvar'}</button>
+      <button class="btn btn-outline" id="btnCancelarPainel${cap(tipo)}">Cancelar</button>
+    </div>
+    <div class="status-line" id="statusPainel${cap(tipo)}" style="display:none;"><span class="dot"></span><span></span></div>
+  `;
+  document.getElementById('btnCancelarPainel'+cap(tipo)).addEventListener('click', ()=>{ painel.style.display='none'; });
+  document.getElementById('btnSalvarPainel'+cap(tipo)).addEventListener('click', ()=> crudSalvar(tipo, idVal));
+}
+function crudLerFormulario(tipo){
+  const cfg = TABELAS_CRUD[tipo];
+  const obj = {};
+  cfg.colunas.forEach(c=>{
+    const el = document.getElementById(`campo_${tipo}_${c.key}`);
+    let v = el.value;
+    if(c.type==='number') v = v==='' ? null : parseFloat(v);
+    else if(v==='') v = null;
+    obj[c.key] = v;
+  });
+  return obj;
+}
+async function crudEditar(tipo, idVal){
+  const st = crudState[tipo];
+  const linha = DEMO_MODE ? st.linhas.find(r=>String(r._demoIndex)===String(idVal)) : st.linhas.find(r=>String(r.id)===String(idVal));
+  crudRenderPainel(tipo, idVal, linha);
+}
+document.getElementById('btnNovoDefinitivo').addEventListener('click', ()=> crudRenderPainel('definitivo', null, null));
+document.getElementById('btnNovoProspeccao').addEventListener('click', ()=> crudRenderPainel('prospeccao', null, null));
+
+/* --- Exclusão total (esvazia a tabela inteira, mantendo a exclusão linha
+   a linha já existente) — pede confirmação por digitação, é irreversível. --- */
+async function crudExcluirTudo(tipo){
+  const cfg = TABELAS_CRUD[tipo];
+  const st = crudState[tipo];
+  const totalAtual = DEMO_MODE ? cfg.getArr().length : st.total;
+  const nomeTabela = tipo==='definitivo' ? 'Frete Definitivo' : 'Frete Prospecção';
+  const digitado = prompt(
+    `Isso vai apagar TODOS os ${totalAtual} registro(s) de ${nomeTabela} — ação irreversível.\n`+
+    `Digite EXCLUIR (em maiúsculas) pra confirmar:`
+  );
+  if(digitado !== 'EXCLUIR'){
+    if(digitado !== null) alert('Texto não confere — nada foi excluído.');
+    return;
+  }
+  const statusEl = 'statusExcluirTudo'+cap(tipo);
+  setStatus(statusEl, 'Excluindo…', null);
+  document.getElementById(statusEl).style.display='flex';
+  try{
+    if(DEMO_MODE){
+      cfg.setArr([]);
+    }else{
+      // Supabase exige uma cláusula WHERE — id >= 0 casa com toda linha
+      // (id é bigint identity, sempre positivo).
+      const { error } = await sb.from(cfg.tabela).delete().gte('id', 0);
+      if(error) throw error;
+    }
+    setStatus(statusEl, `${totalAtual} registro(s) excluído(s).`, true);
+    crudState[tipo].pagina = 0;
+    crudRecarregar(tipo);
+    if(tipo==='definitivo' && !DEMO_MODE) carregarVisaoGeralDoBanco();
+  }catch(err){
+    setStatus(statusEl, 'Erro ao excluir: '+err.message, false);
+  }
+}
+document.getElementById('btnExcluirTudoDefinitivo').addEventListener('click', ()=> crudExcluirTudo('definitivo'));
+document.getElementById('btnExcluirTudoProspeccao').addEventListener('click', ()=> crudExcluirTudo('prospeccao'));
+
+async function crudSalvar(tipo, idVal){
+  const cfg = TABELAS_CRUD[tipo];
+  const dados = crudLerFormulario(tipo);
+  const statusEl = 'statusPainel'+cap(tipo);
+  try{
+    if(idVal===null){
+      // criar
+      if(DEMO_MODE){ cfg.setArr([...cfg.getArr(), dados]); }
+      else{ const { error } = await sb.from(cfg.tabela).insert(dados); if(error) throw error; }
+    }else{
+      // atualizar
+      if(DEMO_MODE){
+        const arr = cfg.getArr(); arr[idVal] = {...arr[idVal], ...dados}; cfg.setArr(arr);
+      }else{
+        const { error } = await sb.from(cfg.tabela).update(dados).eq('id', idVal); if(error) throw error;
+      }
+    }
+    setStatus(statusEl, 'Salvo com sucesso.', true);
+    document.getElementById(statusEl).style.display='flex';
+    document.getElementById('painelEdicao'+cap(tipo)).style.display='none';
+    crudRecarregar(tipo);
+  }catch(err){
+    setStatus(statusEl, 'Erro ao salvar: '+err.message, false);
+    document.getElementById(statusEl).style.display='flex';
+  }
+}
+async function crudExcluir(tipo, idVal){
+  if(!confirm('Excluir esse registro permanentemente?')) return;
+  const cfg = TABELAS_CRUD[tipo];
+  if(DEMO_MODE){
+    cfg.setArr(cfg.getArr().filter((_,i)=>i!==Number(idVal)));
+  }else{
+    const { error } = await sb.from(cfg.tabela).delete().eq('id', idVal);
+    if(error){ alert('Erro ao excluir: '+error.message); return; }
+  }
+  crudRecarregar(tipo);
+}
+</script>
+</body>
+</html>
